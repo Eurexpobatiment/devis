@@ -4,6 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Devis réserves – Eurexpo</title>
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#004C46">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Devis">
 <style>
   body { margin: 0; font-family: Lato, Arial, sans-serif; background: #F5F5F4; color: #334155; }
   .chargement { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; gap: 16px; }
@@ -55,7 +61,13 @@
     .then(function (r) { return r.text(); })
     .then(function (html) {
       if (html.indexOf('appel(') < 0) throw new Error('réponse inattendue du serveur');
-      var shim = '<script>(' + pont.toString() + ')(' + JSON.stringify(API) + ');<\/script>';
+      var icones = '<link rel="icon" type="image/png" href="icon-192.png">' +
+        '<link rel="apple-touch-icon" href="apple-touch-icon.png">' +
+        '<link rel="manifest" href="manifest.json">' +
+        '<meta name="theme-color" content="#004C46">' +
+        '<meta name="apple-mobile-web-app-capable" content="yes">' +
+        '<meta name="apple-mobile-web-app-title" content="Devis">';
+      var shim = icones + '<script>(' + pont.toString() + ')(' + JSON.stringify(API) + ');<\/script>';
       html = html.replace('<base target="_top">', '').replace(/<head>/i, '<head>' + shim);
       document.open();
       document.write(html);
