@@ -110,8 +110,10 @@
   var copie = null;
   try { copie = localStorage.getItem(CLE_PAGE); } catch (e) {}
   if (copie && copie.indexOf('appel(') >= 0) {
-    // Ouverture immédiate avec l'écran gardé sur l'appareil
-    afficher(copie, true);
+    // Ouverture immédiate avec l'écran gardé sur l'appareil, une fois cette page chargée
+    // (sinon l'écran s'insère dedans au lieu de la remplacer)
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function () { afficher(copie, true); });
+    else afficher(copie, true);
   } else {
     fetch(API + '?format=page&k=' + encodeURIComponent(k))
       .then(function (r) { return r.text(); })
