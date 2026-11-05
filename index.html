@@ -27,8 +27,37 @@
   // Adresse de l'appli web Apps Script (Déployer > Gérer les déploiements)
   var API = 'https://script.google.com/macros/s/AKfycbwvBy70FEari6Hd1InA4Agxcdx2JhDCQejMCgnvkhTHD-EQxnBu3T7D40UuDFxiUV7vOw/exec';
 
-  // Remplace google.script.run : chaque appel api…() part en POST vers doPost
-  function pont(API) {
+  // Remplace google.script.run : chaque appel api…() part en POST vers doPost.
+  // Lectures (liste, référentiel) : jusqu'à 3 essais si Google répond mal ou trop lentement.
+  // Modifications (devis, prix, BPU…) : un seul envoi, jamais répété automatiquement (pas de doublon).
+  function pont(API, cfg) {
+    var LECTURES = { apiEtat: 1, apiReferentiel: 1 };
+    function reseau(m) { var e = new Error(m); e.reseau = true; return e; }
+    function envoyer(nom, args, essais) {
+      var lecture = !!LECTURES[nom];
+      var ctl = lecture && window.AbortController ? new AbortController() : null;
+      var t = ctl && setTimeout(function () { ctl.abort(); }, 45000);
+      return fetch(API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ fn: nom, args: args }),
+        signal: ctl ? ctl.signal : undefined
+      }).then(function (r) {
+        if (t) clearTimeout(t);
+        if (!r.ok) throw reseau('le serveur Google ne répond pas (HTTP ' + r.status + ')');
+        return r.json().catch(function () { throw reseau('réponse illisible du serveur Google'); });
+      }, function (e) {
+        if (t) clearTimeout(t);
+        throw reseau(e && e.name === 'AbortError' ? 'le serveur Google met trop de temps à répondre' : 'pas de connexion');
+      }).then(function (d) {
+        if (!d.ok) throw new Error(d.err);
+        return d.res;
+      }).catch(function (e) {
+        if (lecture && e.reseau && essais > 1)
+          return new Promise(function (ok) { setTimeout(ok, 1500); }).then(function () { return envoyer(nom, args, essais - 1); });
+        throw e;
+      });
+    }
     function runner() {
       var ok = function () {}, ko = function () {};
       var p = new Proxy({}, {
@@ -38,14 +67,9 @@
           if (nom === 'withUserObject') return function () { return p; };
           return function () {
             var args = Array.prototype.slice.call(arguments);
-            fetch(API, {
-              method: 'POST',
-              headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-              body: JSON.stringify({ fn: nom, args: args })
-            })
-              .then(function (r) { return r.json(); })
-              .then(function (d) { d.ok ? ok(d.res) : ko(new Error(d.err)); })
-              .catch(function (e) { ko(new Error('Connexion impossible : ' + e.message)); });
+            envoyer(nom, args, 3).then(function (res) { ok(res); }, function (e) {
+              ko(e.reseau ? new Error('Connexion impossible : ' + e.message + '. Réessayez.') : e);
+            });
           };
         }
       });
@@ -54,30 +78,54 @@
     window.google = window.google || {};
     window.google.script = window.google.script || {};
     Object.defineProperty(window.google.script, 'run', { get: runner, configurable: true });
+
+    // Écran ouvert depuis la copie de l'appareil : on vérifie en arrière-plan s'il existe une version
+    // plus récente, qui sera utilisée à la prochaine ouverture (jamais en cours d'utilisation).
+    if (cfg && cfg.maj) setTimeout(function () {
+      fetch(API + '?format=page&k=' + encodeURIComponent(cfg.k)).then(function (r) { return r.text(); }).then(function (h) {
+        if (h.indexOf('appel(') < 0) return;
+        try { localStorage.setItem(cfg.cle, h); } catch (e) {}
+      }).catch(function () {});
+    }, 4000);
   }
 
   var k = new URLSearchParams(location.search).get('k') || '';
-  fetch(API + '?format=page&k=' + encodeURIComponent(k))
-    .then(function (r) { return r.text(); })
-    .then(function (html) {
-      if (html.indexOf('appel(') < 0) throw new Error('réponse inattendue du serveur');
-      var icones = '<link rel="icon" type="image/png" href="icon-192.png">' +
-        '<link rel="apple-touch-icon" href="apple-touch-icon.png">' +
-        '<link rel="manifest" href="manifest.json">' +
-        '<meta name="theme-color" content="#004C46">' +
-        '<meta name="apple-mobile-web-app-capable" content="yes">' +
-        '<meta name="apple-mobile-web-app-title" content="Devis">';
-      var shim = icones + '<script>(' + pont.toString() + ')(' + JSON.stringify(API) + ');<\/script>';
-      html = html.replace('<base target="_top">', '').replace(/<head>/i, '<head>' + shim);
-      document.open();
-      document.write(html);
-      document.close();
-    })
-    .catch(function (e) {
-      document.getElementById('chargement').innerHTML =
-        '<div class="erreur"><b>Impossible de charger l\'outil de devis.</b><br>' + e.message +
-        '<br><br>Vérifiez la connexion puis rechargez la page.</div>';
-    });
+  var CLE_PAGE = 'devis_page_' + k;
+
+  function afficher(html, maj) {
+    var icones = '<link rel="icon" type="image/png" href="icon-192.png">' +
+      '<link rel="apple-touch-icon" href="apple-touch-icon.png">' +
+      '<link rel="manifest" href="manifest.json">' +
+      '<meta name="theme-color" content="#004C46">' +
+      '<meta name="apple-mobile-web-app-capable" content="yes">' +
+      '<meta name="apple-mobile-web-app-title" content="Devis">';
+    var cfg = { maj: maj, k: k, cle: CLE_PAGE };
+    var shim = icones + '<script>(' + pont.toString() + ')(' + JSON.stringify(API) + ',' + JSON.stringify(cfg) + ');<\/script>';
+    html = html.replace('<base target="_top">', '').replace(/<head>/i, '<head>' + shim);
+    document.open();
+    document.write(html);
+    document.close();
+  }
+
+  var copie = null;
+  try { copie = localStorage.getItem(CLE_PAGE); } catch (e) {}
+  if (copie && copie.indexOf('appel(') >= 0) {
+    // Ouverture immédiate avec l'écran gardé sur l'appareil
+    afficher(copie, true);
+  } else {
+    fetch(API + '?format=page&k=' + encodeURIComponent(k))
+      .then(function (r) { return r.text(); })
+      .then(function (html) {
+        if (html.indexOf('appel(') < 0) throw new Error('réponse inattendue du serveur');
+        try { localStorage.setItem(CLE_PAGE, html); } catch (e) {}
+        afficher(html, false);
+      })
+      .catch(function (e) {
+        document.getElementById('chargement').innerHTML =
+          '<div class="erreur"><b>Impossible de charger l\'outil de devis.</b><br>' + e.message +
+          '<br><br>Vérifiez la connexion puis rechargez la page.</div>';
+      });
+  }
 </script>
 </body>
 </html>
