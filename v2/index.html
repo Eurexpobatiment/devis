@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Devis réserves – Eurexpo</title>
+<link rel="icon" type="image/png" href="../icon-192.png">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<meta name="theme-color" content="#004C46">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700&family=Poppins:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root { --vert: #00AB89; --vert-fonce: #004C46; --encre: #1C1917; --texte: #334155; --gris: #78716C; --fond: #F5F5F4;
+          --blanc: #FFFFFF; --alerte: #C00000; --orange: #F0AE40; --ligne: #E7E5E4; --saisie: #0000FF; --jaune: #FFF2CC; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: Lato, Arial, sans-serif; background: var(--fond); color: var(--texte); border-left: 12px solid var(--vert); min-height: 100vh; }
+  header { background: var(--blanc); padding: 18px 28px 0; display: flex; justify-content: space-between; align-items: flex-start; }
+  header h1 { font-family: Poppins, Arial, sans-serif; color: var(--vert-fonce); margin: 0; font-size: 26px; }
+  header .sous { font-size: 13px; margin: 4px 0 10px; }
+  header .sous::after { content: ''; display: block; width: 70px; height: 3px; background: var(--orange); margin-top: 10px; }
+  header img { height: 44px; }
+  nav { background: var(--blanc); padding: 0 28px; display: flex; gap: 4px; flex-wrap: wrap; border-bottom: 1px solid var(--ligne); }
+  nav button { background: none; border: 0; border-bottom: 3px solid transparent; padding: 10px 12px; font: 500 14px Poppins, Arial, sans-serif; color: var(--texte); cursor: pointer; }
+  nav button.actif { border-bottom-color: var(--vert); color: var(--vert-fonce); }
+  main { padding: 22px 28px 40px; }
+  .vue { display: none; } .vue.active { display: block; }
+  .barre { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
+  .barre h2 { font-family: Poppins, Arial, sans-serif; color: var(--vert-fonce); font-size: 19px; margin: 0 0 4px; }
+  .aide { font-size: 12.5px; color: var(--gris); margin: 0; max-width: 760px; }
+  .actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .btn { font: 700 13.5px Poppins, Arial, sans-serif; border: 1.5px solid var(--vert-fonce); background: var(--blanc); color: var(--vert-fonce); border-radius: 8px; padding: 9px 16px; cursor: pointer; white-space: nowrap; }
+  .btn:hover { background: #E6F6F2; } .btn.plein { background: var(--vert); border-color: var(--vert); color: var(--blanc); }
+  .btn.plein:hover { background: #009579; } .btn.petit { padding: 6px 11px; font-size: 12.5px; }
+  .btn.danger { color: var(--alerte); border-color: var(--alerte); } .btn:disabled { opacity: .45; cursor: default; }
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 22px; }
+  .kpi { background: var(--blanc); border-radius: 8px; padding: 16px 18px; border-left: 4px solid var(--vert); }
+  .kpi .val { font: 700 26px Poppins, Arial, sans-serif; color: var(--vert-fonce); } .kpi .lib { font-size: 13px; color: var(--gris); }
+  .cartes { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
+  .carte { background: var(--blanc); border-radius: 10px; padding: 18px 20px; box-shadow: 0 1px 2px rgba(15,23,42,.06); display: flex; flex-direction: column; gap: 10px; }
+  .carte h3 { font: 700 17px Poppins, Arial, sans-serif; color: var(--encre); margin: 0; }
+  .meta { font-size: 13px; color: var(--gris); }
+  .montant { font: 700 24px Poppins, Arial, sans-serif; color: var(--vert-fonce); } .montant small { font: 400 13px Lato, Arial, sans-serif; color: var(--gris); margin-left: 6px; }
+  .badges { display: flex; gap: 6px; flex-wrap: wrap; min-height: 22px; }
+  .badge { font-size: 12px; font-weight: 700; border-radius: 20px; padding: 3px 10px; background: #E6F6F2; color: var(--vert-fonce); white-space: nowrap; }
+  .badge.alerte { background: #FDECEC; color: var(--alerte); } .badge.orange { background: #FDF3E1; color: #9A5B00; }
+  .badge.obs { background: #E0F2FE; color: #075985; }
+  .vide { background: var(--blanc); border-radius: 10px; padding: 28px; text-align: center; color: var(--gris); }
+  .tableau { background: var(--blanc); border-radius: 10px; overflow: auto; max-height: calc(100vh - 260px); }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  thead th { position: sticky; top: 0; background: var(--vert-fonce); color: var(--blanc); text-align: left; padding: 9px 8px; font: 700 12.5px Poppins, Arial, sans-serif; z-index: 1; }
+  td { padding: 6px 8px; border-bottom: 1px solid var(--ligne); vertical-align: middle; }
+  tbody tr:nth-child(even) { background: #FAFAF9; } tr.ko td { color: var(--alerte); }
+  td.num, th.num { text-align: right; }
+  td input, td select { font: 13px Lato, Arial, sans-serif; color: var(--saisie); border: 1px solid var(--ligne); border-radius: 5px; padding: 5px 6px; width: 100%; background: var(--blanc); }
+  td input.vide-pu { background: var(--jaune); } td input[type=number] { text-align: right; }
+  .x { background: none; border: 0; color: var(--gris); cursor: pointer; font-size: 16px; padding: 2px 6px; } .x:hover { color: var(--alerte); }
+  .recherche { font: 13px Lato, Arial, sans-serif; border: 1px solid var(--ligne); border-radius: 8px; padding: 8px 10px; min-width: 200px; }
+  .lien { color: var(--vert); cursor: pointer; text-decoration: underline dotted; }
+  .modale { display: none; position: fixed; inset: 0; background: rgba(28,25,23,.45); z-index: 20; align-items: center; justify-content: center; padding: 20px; }
+  .modale.ouverte { display: flex; }
+  .boite { background: var(--blanc); border-radius: 12px; width: min(1250px, 100%); max-height: 94vh; display: flex; flex-direction: column; padding: 20px 22px; gap: 12px; }
+  .boite .tableau { max-height: none; flex: 1; border: 1px solid var(--ligne); }
+  .attente { display: none; position: fixed; inset: 0; background: rgba(255,255,255,.75); z-index: 30; align-items: center; justify-content: center; flex-direction: column; gap: 14px; text-align: center; padding: 20px; }
+  .attente.ouverte { display: flex; }
+  .rond { width: 42px; height: 42px; border: 4px solid var(--ligne); border-top-color: var(--vert); border-radius: 50%; animation: t 1s linear infinite; }
+  @keyframes t { to { transform: rotate(360deg); } }
+  #toast { position: fixed; right: 20px; bottom: 20px; max-width: 440px; background: var(--vert-fonce); color: var(--blanc); border-radius: 10px; padding: 14px 18px; font-size: 13.5px; white-space: pre-line; display: none; z-index: 40; box-shadow: 0 6px 20px rgba(0,0,0,.2); }
+  #toast.err { background: var(--alerte); }
+  .connexion { max-width: 380px; margin: 60px auto; background: var(--blanc); border-radius: 12px; padding: 28px; display: flex; flex-direction: column; gap: 12px; }
+  .connexion h2 { font-family: Poppins, Arial, sans-serif; color: var(--vert-fonce); margin: 0; }
+  .connexion input { font: 15px Lato, Arial, sans-serif; border: 1px solid var(--ligne); border-radius: 8px; padding: 10px; }
+  .champ { display: flex; flex-direction: column; gap: 4px; font-size: 13px; max-width: 420px; margin-bottom: 14px; }
+  .champ input, .champ textarea { font: 14px Lato, Arial, sans-serif; border: 1px solid var(--ligne); border-radius: 8px; padding: 9px; color: var(--saisie); }
+  .bandeau { background: #FDF3E1; border: 1px solid var(--orange); border-radius: 10px; padding: 14px 18px; margin-bottom: 18px; display: flex; gap: 14px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+  .pied { font-size: 12px; color: var(--gris); margin-top: 26px; }
+  .zone-depot { background: var(--blanc); border: 2px dashed var(--ligne); border-radius: 12px; padding: 36px; text-align: center; }
+</style>
+</head>
+<body>
+<header>
+  <div><h1>Devis réserves</h1><div class="sous">Remise en état après salon · Eurexpo Lyon</div></div>
+  <img src="logo.png" alt="GL events Lyon">
+</header>
+<nav id="nav" style="display:none">
+  <button data-vue="devis" class="actif">Devis</button>
+  <button data-vue="historique">Historique</button>
+  <button data-vue="import">Import manuel</button>
+  <button data-vue="bpu">BPU</button>
+  <button data-vue="mots">Mots-clés</button>
+  <button data-vue="param">Paramètres</button>
+</nav>
+
+<main>
+  <section id="vue-connexion" class="vue active">
+    <div class="connexion" id="boite-connexion">
+      <h2>Connexion</h2>
+      <p class="aide">Même compte que l'appli Équipe (adresse e-mail et mot de passe).</p>
+      <input id="c-email" type="email" placeholder="Adresse e-mail" autocomplete="username">
+      <input id="c-mdp" type="password" placeholder="Mot de passe" autocomplete="current-password">
+      <button class="btn plein" id="c-ok">Se connecter</button>
+      <button class="btn" id="c-oubli">Mot de passe oublié</button>
+      <div id="c-msg" class="aide"></div>
+    </div>
+  </section>
+
+  <section id="vue-devis" class="vue">
+    <div id="bandeau-reprise"></div>
+    <div class="barre">
+      <div><h2>Devis par salon</h2><p class="aide" id="dernier-import"></p></div>
+      <div class="actions"><button class="btn plein" id="synchro">⟳ Synchroniser BatiScript</button></div>
+    </div>
+    <div class="kpis" id="kpis"></div>
+    <div class="cartes" id="cartes"></div>
+  </section>
+
+  <section id="vue-historique" class="vue">
+    <div class="barre">
+      <div><h2>Historique des devis</h2><p class="aide">Devis envoyés, et anciens devis dont les réserves ne sont plus dans l'import. Le PDF reste téléchargeable.</p></div>
+      <div class="actions"><input class="recherche" id="filtre-histo" placeholder="Rechercher (salon, n°)…"></div>
+    </div>
+    <div class="tableau"><table>
+      <thead><tr><th style="width:120px">N° devis</th><th>Salon</th><th style="width:100px">Date devis</th><th style="width:150px">Statut</th><th class="num" style="width:110px">Total HT</th><th class="num" style="width:110px">Total TTC</th><th style="width:280px"></th></tr></thead>
+      <tbody id="corps-histo"></tbody>
+    </table></div>
+  </section>
+
+  <section id="vue-import" class="vue">
+    <div class="barre"><div><h2>Import manuel</h2>
+      <p class="aide">Si la synchronisation BatiScript ne répond pas : BatiScript › Etat des lieux › liste › Rapport (Excel), en incluant tous les états et les colonnes Event, État et Plan, puis déposez le fichier ici. Les réserves remplacent celles de la dernière synchronisation ; les codes, quantités et prix saisis sont conservés.</p></div></div>
+    <div class="zone-depot"><input type="file" id="fichier-import" accept=".xlsx,.xls,.csv"><p class="aide" style="margin:12px auto 0">Fichier Excel ou CSV, en-têtes en première ligne.</p></div>
+  </section>
+
+  <section id="vue-bpu" class="vue">
+    <div class="barre">
+      <div><h2>Bordereau de prix unitaires</h2><p class="aide">Cellules jaunes = prix à renseigner. « Réf. devis » = prix issu des devis régie : cliquez dessus pour l'appliquer. Les devis se recalculent dès l'enregistrement.</p></div>
+      <div class="actions"><input class="recherche" id="filtre-bpu" placeholder="Rechercher…"><button class="btn" id="ajout-bpu">+ Article</button><button class="btn plein" id="sauver-bpu">Enregistrer</button></div>
+    </div>
+    <div class="tableau"><table>
+      <thead><tr><th style="width:80px">Code</th><th style="width:170px">Lot</th><th>Désignation</th><th style="width:70px">Unité</th><th style="width:150px">Prestataire</th><th class="num" style="width:100px">PU HT (€)</th><th class="num" style="width:100px" title="Prix issu des devis régie – cliquer pour l'appliquer">Réf. devis</th><th class="num" style="width:80px">Réserves</th><th style="width:36px"></th></tr></thead>
+      <tbody id="corps-bpu"></tbody>
+    </table></div>
+  </section>
+
+  <section id="vue-mots" class="vue">
+    <div class="barre">
+      <div><h2>Mots-clés de classement</h2><p class="aide">Un mot-clé trouvé dans l'intitulé d'une réserve lui attribue le code BPU ; si l'intitulé ne donne rien, on cherche dans l'observation (badge « via observation » à vérifier). Majuscules et accents ignorés ; si plusieurs correspondent, le plus bas dans la liste l'emporte (mettez les mots généraux en haut, les plus précis en bas).</p></div>
+      <div class="actions"><input class="recherche" id="filtre-mots" placeholder="Rechercher…"><button class="btn" id="ajout-mot">+ Mot-clé</button><button class="btn plein" id="sauver-mots">Enregistrer</button></div>
+    </div>
+    <div class="tableau"><table>
+      <thead><tr><th style="width:280px">Mot-clé (intitulé, sinon observation)</th><th>Code BPU</th><th style="width:110px"></th></tr></thead>
+      <tbody id="corps-mots"></tbody>
+    </table></div>
+  </section>
+
+  <section id="vue-param" class="vue">
+    <div class="barre"><div><h2>Paramètres</h2><p class="aide">Valables pour tous les devis en brouillon (les devis envoyés gardent leurs montants).</p></div></div>
+    <div class="champ"><label for="p-tva">Taux de TVA (%)</label><input id="p-tva" type="number" step="0.1" min="0"></div>
+    <div class="champ"><label for="p-coef">Coefficient de refacturation (1,15 = +15 % ; 1 = prix coûtant)</label><input id="p-coef" type="number" step="0.01" min="0"></div>
+    <div class="champ"><label for="p-exclus">Événements exclus des devis (un par ligne). Les réserves sans événement ou « Abandonnée » sont aussi exclues.</label><textarea id="p-exclus" rows="4"></textarea></div>
+    <button class="btn plein" id="sauver-param">Enregistrer</button>
+  </section>
+
+  <p class="pied" id="pied"></p>
+</main>
+
+<div class="modale" id="modale">
+  <div class="boite">
+    <div class="barre" style="margin:0">
+      <div><h2 id="modale-titre"></h2><p class="aide" id="modale-sous"></p></div>
+      <div class="actions"><button class="btn plein" id="modale-sauver">Enregistrer</button><button class="btn" id="modale-fermer">Fermer</button></div>
+    </div>
+    <div class="tableau"><table>
+      <thead><tr><th style="width:52px">N°</th><th style="width:150px">Constat</th><th style="width:190px">Observations</th><th style="width:100px">Code</th><th>Désignation</th><th class="num" style="width:76px">Qté</th><th class="num" style="width:100px">PU HT</th><th class="num" style="width:100px">Montant HT</th></tr></thead>
+      <tbody id="modale-corps"></tbody>
+    </table></div>
+    <p class="aide">PU vide = prix du BPU. Un prix saisi ici ne concerne que cette réserve et prime sur le BPU ; il est conservé aux prochaines synchronisations, comme le code forcé et la quantité.</p>
+  </div>
+</div>
+<div class="attente" id="attente"><div class="rond"></div><div id="attente-msg"></div></div>
+<div id="toast"></div>
+
+<script type="module">
+/* ====== À RENSEIGNER ====== */
+const CONFIG = {
+  firebase: {
+    apiKey: 'AIzaSyARtP0RMkulG6c53-bnazwpGTspl0LgAhk', // clé publique (faite pour être dans la page)
+    authDomain: 'equipe-batiment.firebaseapp.com',
+    projectId: 'equipe-batiment',
+    storageBucket: 'equipe-batiment.firebasestorage.app',
+    messagingSenderId: '408022301135',
+    appId: '1:408022301135:web:69dee0a5fb479154657aba'
+  },
+  // Script Google de l'appli devis (relais BatiScript : fonction apiReservesFirebase)
+  relais: 'https://script.google.com/macros/s/AKfycbwvBy70FEari6Hd1InA4Agxcdx2JhDCQejMCgnvkhTHD-EQxnBu3T7D40UuDFxiUV7vOw/exec'
+};
+/* ========================== */
+
+import * as FB from './fb.js?v=1';
+import * as L from './logic.js?v=1';
+import * as OUT from './sortie.js?v=1';
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const auj = () => new Date().toLocaleDateString('fr-FR');
+const regId = salon => L.norm(salon).replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'salon';
+
+let toastT;
+function toast(msg, err) {
+  const t = $('toast'); t.textContent = msg; t.className = err ? 'err' : ''; t.style.display = 'block';
+  clearTimeout(toastT); toastT = setTimeout(() => { t.style.display = 'none'; }, err ? 9000 : 6000);
+}
+function attendre(msg) { $('attente-msg').textContent = msg; $('attente').classList.add('ouverte'); }
+function fini() { $('attente').classList.remove('ouverte'); }
+async function tache(msg, f) {
+  attendre(msg);
+  try { return await f(); } catch (e) { toast(e && e.message ? e.message : String(e), true); } finally { fini(); }
+}
+
+/* ---------- État ---------- */
+const S = { bpu: [], reserves: [], registre: [], config: null, mots: null, meta: null, charge: {} };
+let CALC = {};
+const param = () => ({ tva: S.config ? S.config.tva : 0.2, coef: S.config ? S.config.coef : 1, exclus: S.config ? S.config.exclus || [] : [] });
+const motsListe = () => (S.mots && S.mots.liste) || [];
+const regDe = salon => S.registre.find(r => r.id === regId(salon));
+
+function recalculer() {
+  const garde = {};
+  S.reserves.forEach(r => { garde[r.num] = { force: r.force, qte: r.qte, puForce: r.puForce }; });
+  CALC = L.calculer(S.reserves, motsListe(), S.bpu, param(), garde);
+}
+
+function devisPour(salon) {
+  const d = CALC[salon]; const reg = regDe(salon) || {};
+  return Object.assign({ salon, num: reg.num || '', date: reg.date || auj(), source: S.meta ? S.meta.dernierImport : '' }, d);
+}
+function devisHisto(reg) {
+  if (reg.snap) return Object.assign({ salon: reg.salon, num: reg.num, date: reg.date, source: reg.source || '' }, reg.snap);
+  // devis envoyé avant la version Firebase : pas de copie figée, son PDF reste dans Drive
+  if (L.norm(reg.statut) !== 'envoye' && CALC[reg.salon]) return devisPour(reg.salon);
+  return null;
+}
+
+/* ---------- Affichage ---------- */
+let dessinPrevu = false;
+function dessiner() {
+  if (dessinPrevu) return; dessinPrevu = true;
+  requestAnimationFrame(() => { dessinPrevu = false; recalculer(); dessinerDevis(); dessinerHisto(); if (!BPU_EDIT) dessinerBpu(); if (!MOTS_EDIT) dessinerMots(); if (!PARAM_EDIT) remplirParam(); });
+}
+
+function dessinerDevis() {
+  $('dernier-import').textContent = S.meta && S.meta.dernierImport ? 'Dernier import : ' + S.meta.dernierImport : 'Aucun import pour le moment.';
+  $('bandeau-reprise').innerHTML = S.charge.config && !S.config
+    ? '<div class="bandeau"><div><b>Première ouverture :</b> la base est vide. Reprenez les données de l\'appli actuelle (BPU, mots-clés, paramètres, registre des devis et réserves) en choisissant le fichier <b>reprise.json</b>.</div><button class="btn plein" id="reprise">Reprendre les données</button></div>' : '';
+  const salons = Object.keys(CALC).sort((a, b) => a.localeCompare(b, 'fr')).filter(s => { const r = regDe(s); return !r || L.norm(r.statut) !== 'envoye'; });
+  let n = 0, ht = 0, al = 0;
+  salons.forEach(s => { n += CALC[s].n; ht += CALC[s].ht; al += CALC[s].nc + CALC[s].sansPu; });
+  $('kpis').innerHTML =
+    '<div class="kpi"><div class="val">' + salons.length + '</div><div class="lib">salon(s)</div></div>' +
+    '<div class="kpi"><div class="val">' + n + '</div><div class="lib">réserves facturables</div></div>' +
+    '<div class="kpi"><div class="val">' + L.euros(L.arrondi(ht)) + '</div><div class="lib">total HT</div></div>' +
+    '<div class="kpi" style="border-left-color:' + (al ? '#C00000' : '#00AB89') + '"><div class="val">' + al + '</div><div class="lib">réserve(s) à compléter</div></div>';
+  if (!salons.length) { $('cartes').innerHTML = '<div class="vide">Aucune réserve de salon. Cliquez sur « Synchroniser BatiScript » pour commencer.</div>'; return; }
+  $('cartes').innerHTML = salons.map(s => {
+    const d = CALC[s], r = regDe(s) || {};
+    let b = '';
+    if (d.nc) b += '<span class="badge alerte">' + d.nc + ' non classée(s)</span>';
+    if (d.sansPu) b += '<span class="badge orange">' + d.sansPu + ' sans prix</span>';
+    const obs = d.lignes.filter(l => l.via === 'observation' && !l.force).length;
+    if (obs) b += '<span class="badge obs">' + obs + ' via observation</span>';
+    if (!d.nc && !d.sansPu) b += '<span class="badge">Complet</span>';
+    return '<div class="carte"><h3>' + esc(s) + '</h3>' +
+      '<div class="meta">' + esc(r.num || 'N° attribué à la synchronisation') + ' · ' + esc(r.date || auj()) + ' · ' + d.n + ' réserve(s)</div>' +
+      '<div class="badges">' + b + '</div>' +
+      '<div class="montant">' + L.euros(d.ht) + '<small>HT · ' + L.euros(d.ttc) + ' TTC</small></div>' +
+      '<div class="actions">' +
+      '<button class="btn petit plein" data-pdf="' + esc(s) + '">PDF</button>' +
+      '<button class="btn petit" data-xls="' + esc(s) + '">Excel</button>' +
+      '<button class="btn petit" data-detail="' + esc(s) + '">Voir les réserves</button>' +
+      '<button class="btn petit" data-envoye="' + esc(s) + '" title="Fige le devis et le range dans l\'historique">Marquer envoyé</button>' +
+      '<button class="btn petit danger" data-suppr="' + esc(s) + '" title="Supprime ce devis brouillon et ses réserves ; il sera recréé à la prochaine synchronisation">Supprimer</button>' +
+      '</div></div>';
+  }).join('');
+}
+
+function dessinerHisto() {
+  const f = L.norm($('filtre-histo').value);
+  const rows = S.registre.filter(r => L.norm(r.statut) === 'envoye' || !CALC[r.salon])
+    .filter(r => !f || L.norm(r.salon + ' ' + r.num).indexOf(f) >= 0)
+    .sort((a, b) => String(b.num).localeCompare(String(a.num)));
+  $('corps-histo').innerHTML = rows.length ? rows.map(r => {
+    const envoye = L.norm(r.statut) === 'envoye';
+    const d = devisHisto(r);
+    const ht = d ? d.ht : r.ht, ttc = d ? d.ttc : r.ttc;
+    const pdf = d ? '<button class="btn petit" data-hpdf="' + esc(r.id) + '">PDF</button><button class="btn petit" data-hxls="' + esc(r.id) + '">Excel</button>'
+      : (r.url ? '<a class="btn petit" href="' + esc(r.url) + '" target="_blank" rel="noopener">PDF (Drive)</a>' : '');
+    return '<tr><td>' + esc(r.num) + '</td><td>' + esc(r.salon) + '</td><td>' + esc(r.date) + '</td><td>' +
+      (envoye ? '<span class="badge">Envoyé' + (r.envoyeLe ? ' le ' + esc(r.envoyeLe) : '') + '</span>' : '<span class="badge orange">Réserves absentes de l\'import</span>') +
+      '</td><td class="num">' + L.euros(ht) + '</td><td class="num">' + L.euros(ttc) + '</td><td><div class="actions">' + pdf +
+      (envoye && CALC[r.salon] ? '<button class="btn petit" data-brouillon="' + esc(r.id) + '">Remettre en brouillon</button>' : '') +
+      '</div></td></tr>';
+  }).join('') : '<tr><td colspan="7" class="aide" style="padding:18px">Aucun devis dans l\'historique.</td></tr>';
+}
+
+/* ---------- Synchronisation et import ---------- */
+async function appliquerImport(entetes, lignes, source) {
+  const rows = L.lireLignesImport(entetes, lignes);
+  if (!rows.length) throw new Error('Aucune réserve trouvée dans l\'import.');
+  const nums = new Set(rows.map(r => r.num));
+  const ops = rows.map(r => ({ col: 'DevisReserves', id: r.num, merge: true,
+    data: { num: r.num, ev: r.ev, lot: r.lot, int: r.int, obs: r.obs, cre: r.cre, etat: r.etat, plan: r.plan, entr: r.entr } }));
+  S.reserves.filter(r => !nums.has(r.num)).forEach(r => ops.push({ col: 'DevisReserves', id: r.id, suppr: true }));
+  await FB.ecrire(ops);
+  await FB.majParam('meta', { dernierImport: source });
+  // numéros des nouveaux devis et date des brouillons
+  const P = param();
+  const salons = [...new Set(rows.filter(r => L.facturable(r, P.exclus)).map(r => r.ev))];
+  const annee = String(new Date().getFullYear());
+  let nouveaux = 0;
+  for (const s of salons) {
+    const reg = regDe(s);
+    if (reg && L.norm(reg.statut) === 'envoye') continue;
+    if (!reg || !reg.num) { await FB.attribuerNumero(regId(s), s, annee); nouveaux++; }
+    else await FB.majRegistre(reg.id, { date: auj() });
+  }
+  return rows.length + ' réserves importées (' + salons.length + ' salon(s) facturable(s)' + (nouveaux ? ', ' + nouveaux + ' nouveau(x) devis' : '') + ').';
+}
+
+async function synchroniser() {
+  const msg = await tache('Lecture des réserves dans BatiScript… (quelques secondes)', async () => {
+    const tok = await FB.jeton();
+    let rep;
+    try {
+      rep = await fetch(CONFIG.relais, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ fn: 'apiReservesFirebase', args: [tok] }) });
+    } catch (e) { throw new Error('Le script Google ne répond pas (connexion ?). Vous pouvez passer par « Import manuel ».'); }
+    const d = await rep.json().catch(() => { throw new Error('Réponse illisible du script Google.'); });
+    if (!d.ok) throw new Error('BatiScript : ' + d.err);
+    return appliquerImport(d.res.entetes, d.res.lignes, 'API BatiScript (synchronisé le ' + d.res.quand + ')');
+  });
+  if (msg) toast(msg);
+}
+
+async function importerFichier(f) {
+  const msg = await tache('Lecture du fichier…', async () => {
+    const X = await OUT.sheetjs();
+    const wb = X.read(await f.arrayBuffer(), { type: 'array', cellDates: true });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const aoa = X.utils.sheet_to_json(ws, { header: 1, raw: false, dateNF: 'dd/mm/yyyy', defval: '' });
+    const h = aoa.findIndex(r => r.some(c => L.norm(c) === 'n°'));
+    if (h < 0) throw new Error('En-tête « N° » introuvable dans le fichier.');
+    return appliquerImport(aoa[h], aoa.slice(h + 1), f.name + ' (importé le ' + auj() + ')');
+  });
+  $('fichier-import').value = '';
+  if (msg) toast(msg);
+}
+
+/* ---------- Reprise des données de l'appli Google ---------- */
+// Le fichier reprise.json (fourni à part, jamais publié sur GitHub) est choisi sur l'ordinateur
+function choisirReprise() {
+  const i = document.createElement('input'); i.type = 'file'; i.accept = '.json,application/json';
+  i.onchange = () => { if (i.files[0]) reprendre(i.files[0]); };
+  i.click();
+}
+async function reprendre(fichier) {
+  if (!confirm('Copier dans Firebase les données de « ' + fichier.name + ' » (BPU, mots-clés, paramètres, registre, réserves) ?\nL\'appli Google n\'est pas modifiée.')) return;
+  const msg = await tache('Reprise des données…', async () => {
+    let D;
+    try { D = JSON.parse(await fichier.text()); } catch (e) { throw new Error('Fichier illisible : choisissez reprise.json.'); }
+    if (!D.bpu || !D.mots || !D.param || !D.registre || !D.imp) throw new Error('Ce fichier n\'est pas un fichier de reprise de l\'appli devis.');
+    const garde = {}; D.garde.forEach(g => { garde[g.num] = g; });
+    const ops = [];
+    D.bpu.forEach(b => ops.push({ col: 'DevisBPU', id: b.code, data: b }));
+    const ent = ['N°', 'Event', 'Lot', 'Intitulé', 'Observations', 'Création', 'État', 'Plan', 'Entreprise'];
+    L.lireLignesImport(ent, D.imp).forEach(r => {
+      const g = garde[r.num] || {};
+      ops.push({ col: 'DevisReserves', id: r.num, data: Object.assign(r, { force: g.force || '', qte: g.qte == null ? 1 : g.qte, puForce: g.puForce == null ? null : g.puForce }) });
+    });
+    let max = 0;
+    D.registre.forEach(r => {
+      const m = /^DEV-(\d{4})-(\d+)$/.exec(r.num); if (m && m[1] === String(new Date().getFullYear())) max = Math.max(max, Number(m[2]));
+      ops.push({ col: 'DevisRegistre', id: regId(r.salon), data: r });
+    });
+    await FB.ecrire(ops);
+    await FB.majParam('mots', { liste: D.mots });
+    await FB.majParam('meta', { dernierImport: 'reprise de l\'appli Google (' + auj() + ')', compteurs: { [String(new Date().getFullYear())]: max } });
+    await FB.majParam('config', D.param);
+    return 'Données reprises : ' + D.bpu.length + ' articles, ' + D.mots.length + ' mots-clés, ' + D.registre.length + ' devis, ' + D.imp.length + ' réserves.';
+  });
+  if (msg) toast(msg);
+}
+
+/* ---------- Actions sur les devis ---------- */
+async function sortir(d, type) {
+  if (!d) return;
+  try {
+    const r = await OUT.enregistrer(OUT.nomFichier(d, type === 'pdf' ? 'pdf' : 'xlsx'),
+      type === 'pdf' ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      () => type === 'pdf' ? OUT.pdf(d) : OUT.excel(d),
+      () => attendre(type === 'pdf' ? 'Fabrication du PDF…' : 'Fabrication du fichier Excel…'));
+    if (r === 'enregistre') toast('Fichier enregistré.');
+  } catch (e) { toast(e && e.message ? e.message : String(e), true); } finally { fini(); }
+}
+const compact = d => ({ n: d.n, nc: d.nc, sansPu: d.sansPu, ht: d.ht, tva: d.tva, ttc: d.ttc, taux: d.taux,
+  lignes: d.lignes.map(l => ({ num: l.num, plan: l.plan, constat: l.constat, obs: l.obs, code: l.code, connu: l.connu, des: l.des, unite: l.unite, qte: l.qte, pu: l.pu, mt: l.mt })) });
+
+async function marquerEnvoye(s) {
+  const d = devisPour(s);
+  if (!d.num) return toast('Ce devis n\'a pas encore de numéro : lancez une synchronisation.', true);
+  if (!confirm('Marquer le devis ' + d.num + ' (' + s + ') comme envoyé ?\nIl est figé (' + L.euros(d.ht) + ' HT) et passe dans l\'historique.' + (d.nc || d.sansPu ? '\n\nAttention : ' + d.nc + ' non classée(s), ' + d.sansPu + ' sans prix.' : ''))) return;
+  await tache('Enregistrement…', () => FB.majRegistre(regId(s), { salon: s, num: d.num, date: d.date, statut: 'Envoyé', envoyeLe: auj(),
+    ht: d.ht, tva: d.tva, ttc: d.ttc, source: d.source || '', snap: compact(d) }));
+  toast('Devis ' + d.num + ' marqué envoyé : il est maintenant dans l\'historique.');
+}
+async function remettreBrouillon(id) {
+  const r = S.registre.find(x => x.id === id); if (!r) return;
+  if (!confirm('Remettre le devis ' + r.num + ' (' + r.salon + ') en brouillon ?\nIl sera recalculé avec le BPU et les mots-clés actuels.')) return;
+  await tache('Enregistrement…', () => FB.majRegistre(id, { statut: 'Brouillon', envoyeLe: '', snap: FB.effacerChamp() }));
+  toast('Devis ' + r.num + ' remis en brouillon : il est de retour sur l\'accueil.');
+}
+async function supprimer(s) {
+  const r = regDe(s);
+  if (!confirm('Supprimer le devis brouillon ' + (r && r.num ? r.num + ' ' : '') + '(' + s + ') et ses réserves ?\nIl sera recréé à la prochaine synchronisation si ses réserves figurent toujours dans BatiScript.')) return;
+  await tache('Suppression…', async () => {
+    const ops = S.reserves.filter(x => x.ev === s).map(x => ({ col: 'DevisReserves', id: x.id, suppr: true }));
+    await FB.ecrire(ops);
+    if (r) await FB.supprRegistre(r.id);
+  });
+  toast('Devis ' + s + ' supprimé.');
+}
+
+/* ---------- Détail des réserves d'un devis ---------- */
+let MOD = null;
+const bpuParCode = () => { const m = {}; S.bpu.forEach(b => { m[b.code] = b; }); return m; };
+let OPTS = null;
+const optsHtml = () => OPTS = OPTS || '<option value="">— ? —</option>' + S.bpu.slice().sort((a, b) => a.code.localeCompare(b.code))
+  .map(b => '<option value="' + esc(b.code) + '">' + esc(b.code + ' – ' + b.des) + '</option>').join('');
+
+function detail(s) {
+  OPTS = null;
+  const d = CALC[s];
+  MOD = { salon: s, lignes: d.lignes.map(l => Object.assign({}, l, { choix: l.code })) };
+  $('modale-titre').textContent = s;
+  majSousTitre();
+  dessinerModale();
+  $('modale').classList.add('ouverte');
+}
+function majSousTitre() {
+  const B = bpuParCode(), P = param();
+  let ht = 0; MOD.lignes.forEach(l => { const m = montant(l, B, P); if (m !== null) ht += m; });
+  const r = regDe(MOD.salon) || {};
+  $('modale-sous').textContent = (r.num || 'Devis') + ' · ' + MOD.lignes.length + ' réserve(s) · ' + L.euros(L.arrondi(ht)) + ' HT';
+}
+function puDe(l, B, P) {
+  const a = B[l.choix]; if (!a) return null;
+  if (l.puForce !== null && l.puForce !== undefined && l.puForce !== '') return Number(l.puForce);
+  return L.nombre(a.pu) === null ? null : L.nombre(a.pu) * (L.nombre(P.coef) || 1);
+}
+const montant = (l, B, P) => { const pu = puDe(l, B, P); return pu === null ? null : (Number(l.qte) || 0) * pu; };
+function viaObs(l) {
+  return l.via === 'observation' && !l.force && l.choix === l.auto
+    ? ' <span class="badge obs" title="Code trouvé grâce à l\'observation (intitulé sans mot-clé) : à vérifier">via observation</span>' : '';
+}
+function ligneHtml(l, i, B, P) {
+  const a = B[l.choix], mt = montant(l, B, P);
+  const puB = a && L.nombre(a.pu) !== null ? L.nombre(a.pu) * (L.nombre(P.coef) || 1) : null;
+  return '<tr data-i="' + i + '" class="' + (a ? '' : 'ko') + '"><td>' + esc(l.num) + '</td><td>' + esc(l.constat) + '</td><td>' + esc(l.obs) + '</td>' +
+    '<td><select data-c="choix">' + (l.choix ? '<option value="' + esc(l.choix) + '" selected>' + esc(l.choix) + '</option>' : '<option value="">— ? —</option>') + '</select></td>' +
+    '<td>' + (a ? esc(a.des) : '⚠ Non classé') + viaObs(l) + (l.choix !== l.auto && l.choix ? ' <span class="badge orange">code forcé</span>' : '') + '</td>' +
+    '<td class="num"><input type="number" min="0" step="1" data-c="qte" value="' + esc(l.qte) + '"></td>' +
+    '<td class="num"><input type="number" min="0" step="0.01" data-c="puForce" class="' + (a && puB === null && (l.puForce === null || l.puForce === '') ? 'vide-pu' : '') + '" value="' + (l.puForce === null || l.puForce === undefined ? '' : esc(l.puForce)) + '" placeholder="' + (puB === null ? 'à saisir' : puB.toFixed(2)) + '"></td>' +
+    '<td class="num">' + L.euros(mt) + '</td></tr>';
+}
+function dessinerModale() { const B = bpuParCode(), P = param(); $('modale-corps').innerHTML = MOD.lignes.map((l, i) => ligneHtml(l, i, B, P)).join(''); }
+$('modale-corps').addEventListener('focusin', ev => {
+  const t = ev.target; if (t.tagName !== 'SELECT' || t.dataset.plein) return;
+  const v = t.value; t.innerHTML = optsHtml(); t.value = v; t.dataset.plein = '1';
+});
+$('modale-corps').addEventListener('change', ev => {
+  const t = ev.target, tr = t.closest('tr'); if (!tr) return;
+  const l = MOD.lignes[Number(tr.dataset.i)], c = t.dataset.c;
+  if (c === 'choix') l.choix = t.value;
+  if (c === 'qte') l.qte = t.value === '' ? 1 : Number(t.value);
+  if (c === 'puForce') l.puForce = t.value === '' ? null : Number(t.value);
+  const B = bpuParCode(), P = param();
+  const n = document.createElement('tbody'); n.innerHTML = ligneHtml(l, Number(tr.dataset.i), B, P);
+  tr.replaceWith(n.firstChild); majSousTitre();
+});
+$('modale-fermer').addEventListener('click', () => { $('modale').classList.remove('ouverte'); MOD = null; });
+$('modale-sauver').addEventListener('click', async () => {
+  const ops = [];
+  for (const l of MOD.lignes) {
+    if (l.qte < 0 || isNaN(l.qte)) return toast('Quantité invalide pour la réserve ' + l.num + '.', true);
+    if (l.puForce !== null && (isNaN(l.puForce) || l.puForce < 0)) return toast('Prix invalide pour la réserve ' + l.num + '.', true);
+    const force = l.choix && l.choix !== l.auto ? l.choix : '';
+    const orig = S.reserves.find(r => r.num === l.num) || {};
+    const avant = { force: orig.force || '', qte: L.nombre(orig.qte) === null ? 1 : L.nombre(orig.qte), puForce: L.nombre(orig.puForce) };
+    if (force !== avant.force || l.qte !== avant.qte || (l.puForce === null ? null : l.puForce) !== avant.puForce)
+      ops.push({ col: 'DevisReserves', id: l.num, merge: true, data: { force, qte: l.qte, puForce: l.puForce } });
+  }
+  if (!ops.length) return toast('Aucune modification.');
+  await tache('Enregistrement…', () => FB.ecrire(ops));
+  toast(ops.length + ' ligne(s) enregistrée(s).');
+  $('modale').classList.remove('ouverte'); MOD = null;
+});
+
+/* ---------- BPU ---------- */
+let BPU_EDIT = null; // copie en cours de modification
+function lignesBpu() { return BPU_EDIT || S.bpu.slice().sort((a, b) => a.code.localeCompare(b.code)).map(b => Object.assign({}, b)); }
+function dessinerBpu() {
+  const f = L.norm($('filtre-bpu').value);
+  const cpt = {}; Object.values(CALC).forEach(d => d.lignes.forEach(l => { if (l.connu) cpt[l.code] = (cpt[l.code] || 0) + 1; }));
+  const rows = lignesBpu();
+  $('corps-bpu').innerHTML = rows.map((b, i) => {
+    if (f && L.norm([b.code, b.lot, b.des, b.presta].join(' ')).indexOf(f) < 0) return '';
+    const ref = b.ref && L.nombre(b.ref.pu) !== null ? L.nombre(b.ref.pu) : null;
+    return '<tr data-i="' + i + '">' +
+      '<td><input data-c="code" value="' + esc(b.code) + '"></td><td><input data-c="lot" value="' + esc(b.lot) + '"></td>' +
+      '<td><input data-c="des" value="' + esc(b.des) + '"></td><td><input data-c="unite" value="' + esc(b.unite) + '"></td>' +
+      '<td><input data-c="presta" value="' + esc(b.presta) + '"></td>' +
+      '<td class="num"><input type="number" step="0.01" min="0" data-c="pu" class="' + (L.nombre(b.pu) === null ? 'vide-pu' : '') + '" value="' + (L.nombre(b.pu) === null ? '' : b.pu) + '"></td>' +
+      '<td class="num">' + (ref === null ? '' : '<span class="lien" data-ref="' + i + '" title="' + esc(b.ref.nb ? b.ref.nb + ' ligne(s) de devis régie, ' + b.ref.salons + ' salon(s), fiabilité ' + b.ref.fiab : '') + '">' + L.euros(ref) + '</span>') + '</td>' +
+      '<td class="num">' + (cpt[b.code] || '') + '</td><td><button class="x" data-del="' + i + '" title="Supprimer l\'article">×</button></td></tr>';
+  }).join('');
+}
+const editBpu = () => { if (!BPU_EDIT) BPU_EDIT = lignesBpu(); return BPU_EDIT; };
+$('corps-bpu').addEventListener('input', ev => {
+  const t = ev.target, tr = t.closest('tr'); if (!tr || !t.dataset.c) return;
+  const b = editBpu()[Number(tr.dataset.i)];
+  b[t.dataset.c] = t.dataset.c === 'pu' ? (t.value === '' ? null : Number(t.value)) : t.value;
+  if (t.dataset.c === 'pu') t.classList.toggle('vide-pu', t.value === '');
+});
+$('corps-bpu').addEventListener('click', ev => {
+  const t = ev.target;
+  if (t.dataset.ref !== undefined) { const b = editBpu()[Number(t.dataset.ref)]; b.pu = L.nombre(b.ref.pu); dessinerBpu(); }
+  if (t.dataset.del !== undefined) { const b = editBpu()[Number(t.dataset.del)]; if (confirm('Supprimer l\'article ' + b.code + ' – ' + b.des + ' ?')) { BPU_EDIT.splice(Number(t.dataset.del), 1); dessinerBpu(); } }
+});
+$('ajout-bpu').addEventListener('click', () => { editBpu().unshift({ code: '', lot: '', des: '', unite: 'u', presta: '', pu: null, rem: '', ref: null }); $('filtre-bpu').value = ''; dessinerBpu(); });
+$('filtre-bpu').addEventListener('input', dessinerBpu);
+$('sauver-bpu').addEventListener('click', async () => {
+  if (!BPU_EDIT) return toast('Aucune modification.');
+  const vus = {};
+  for (const b of BPU_EDIT) {
+    b.code = String(b.code || '').trim();
+    if (!/^\d{2}\.\d{2}$/.test(b.code)) return toast('Code « ' + b.code + ' » invalide : format attendu 00.00 (ex. 03.17).', true);
+    if (vus[b.code]) return toast('Le code ' + b.code + ' est en double.', true);
+    if (!String(b.des || '').trim()) return toast('Désignation manquante pour le code ' + b.code + '.', true);
+    vus[b.code] = 1;
+  }
+  const ancien = {}; S.bpu.forEach(b => { ancien[b.code] = b; });
+  const champs = ['code', 'lot', 'des', 'unite', 'presta', 'pu', 'rem'];
+  const ops = [];
+  BPU_EDIT.forEach(b => {
+    const a = ancien[b.code];
+    if (!a || champs.some(c => String(a[c] == null ? '' : a[c]) !== String(b[c] == null ? '' : b[c])))
+      ops.push({ col: 'DevisBPU', id: b.code, merge: true, data: { code: b.code, lot: b.lot || '', des: b.des, unite: b.unite || '', presta: b.presta || '', pu: L.nombre(b.pu), rem: b.rem || '', ref: b.ref || null } });
+  });
+  S.bpu.forEach(a => { if (!vus[a.code]) ops.push({ col: 'DevisBPU', id: a.id, suppr: true }); });
+  if (!ops.length) { BPU_EDIT = null; return toast('Aucune modification.'); }
+  const ok = await tache('Enregistrement du BPU…', () => FB.ecrire(ops).then(() => true));
+  if (ok) { BPU_EDIT = null; OPTS = null; dessiner(); toast('BPU enregistré (' + ops.length + ' article(s) modifié(s)). Les devis sont recalculés.'); }
+});
+
+/* ---------- Mots-clés ---------- */
+let MOTS_EDIT = null;
+const lignesMots = () => MOTS_EDIT || motsListe().map(m => ({ mot: m.mot, code: m.code }));
+const editMots = () => { if (!MOTS_EDIT) MOTS_EDIT = lignesMots(); return MOTS_EDIT; };
+function dessinerMots() {
+  const f = L.norm($('filtre-mots').value), opts = optsHtml();
+  const rows = lignesMots();
+  $('corps-mots').innerHTML = rows.map((m, i) => {
+    if (f && L.norm(m.mot + ' ' + m.code).indexOf(f) < 0) return '';
+    return '<tr data-i="' + i + '"><td><input data-c="mot" value="' + esc(m.mot) + '"></td>' +
+      '<td><select data-c="code" data-v="' + esc(m.code) + '">' + (m.code ? '<option value="' + esc(m.code) + '" selected>' + esc(m.code + ' – ' + ((S.bpu.find(b => b.code === m.code) || {}).des || '⚠ code absent du BPU')) + '</option>' : '<option value="">— choisir —</option>') + '</select></td>' +
+      '<td><button class="x" data-haut="' + i + '" title="Monter">↑</button><button class="x" data-bas="' + i + '" title="Descendre">↓</button><button class="x" data-del="' + i + '" title="Supprimer">×</button></td></tr>';
+  }).join('');
+}
+$('corps-mots').addEventListener('focusin', ev => {
+  const t = ev.target; if (t.tagName !== 'SELECT' || t.dataset.plein) return;
+  const v = t.value; t.innerHTML = optsHtml(); t.value = v; t.dataset.plein = '1';
+});
+$('corps-mots').addEventListener('input', ev => { const t = ev.target, tr = t.closest('tr'); if (tr && t.dataset.c) editMots()[Number(tr.dataset.i)][t.dataset.c] = t.value; });
+$('corps-mots').addEventListener('change', ev => { const t = ev.target, tr = t.closest('tr'); if (tr && t.dataset.c) editMots()[Number(tr.dataset.i)][t.dataset.c] = t.value; });
+$('corps-mots').addEventListener('click', ev => {
+  const t = ev.target, M = () => editMots();
+  if (t.dataset.del !== undefined) { M().splice(Number(t.dataset.del), 1); dessinerMots(); }
+  if (t.dataset.haut !== undefined) { const i = Number(t.dataset.haut); if (i > 0) { const a = M(); [a[i - 1], a[i]] = [a[i], a[i - 1]]; dessinerMots(); } }
+  if (t.dataset.bas !== undefined) { const i = Number(t.dataset.bas), a = M(); if (i < a.length - 1) { [a[i + 1], a[i]] = [a[i], a[i + 1]]; dessinerMots(); } }
+});
+$('ajout-mot').addEventListener('click', () => { editMots().unshift({ mot: '', code: '' }); $('filtre-mots').value = ''; dessinerMots(); $('corps-mots').querySelector('input').focus(); });
+$('filtre-mots').addEventListener('input', dessinerMots);
+$('sauver-mots').addEventListener('click', async () => {
+  if (!MOTS_EDIT) return toast('Aucune modification.');
+  const codes = new Set(S.bpu.map(b => b.code));
+  const liste = MOTS_EDIT.map(m => ({ mot: String(m.mot || '').trim(), code: String(m.code || '').trim() })).filter(m => m.mot || m.code);
+  const bad = liste.find(m => !m.mot || !codes.has(m.code));
+  if (bad) return toast('Mot-clé « ' + (bad.mot || '(vide)') + ' » : ' + (!bad.mot ? 'mot manquant' : 'choisissez un code BPU') + '.', true);
+  const ok = await tache('Enregistrement des mots-clés…', () => FB.majParam('mots', { liste }).then(() => true));
+  if (ok) { MOTS_EDIT = null; dessiner(); toast('Mots-clés enregistrés (' + liste.length + '). Les devis sont reclassés.'); }
+});
+
+/* ---------- Paramètres ---------- */
+let PARAM_EDIT = false;
+function remplirParam() { const P = param(); $('p-tva').value = Math.round(P.tva * 1000) / 10; $('p-coef').value = P.coef; $('p-exclus').value = (P.exclus || []).join('\n'); }
+['p-tva', 'p-coef', 'p-exclus'].forEach(id => $(id).addEventListener('input', () => { PARAM_EDIT = true; }));
+$('sauver-param').addEventListener('click', async () => {
+  const tva = Number($('p-tva').value) / 100, coef = Number($('p-coef').value);
+  if (!(tva >= 0 && tva < 1)) return toast('Taux de TVA invalide.', true);
+  if (!(coef > 0)) return toast('Coefficient invalide.', true);
+  const exclus = $('p-exclus').value.split('\n').map(s => s.trim()).filter(Boolean);
+  const ok = await tache('Enregistrement…', () => FB.majParam('config', { tva, coef, exclus }).then(() => true));
+  if (ok) { PARAM_EDIT = false; toast('Paramètres enregistrés.'); }
+});
+
+/* ---------- Navigation et boutons ---------- */
+document.querySelectorAll('nav button').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('nav button').forEach(x => x.classList.toggle('actif', x === b));
+  document.querySelectorAll('.vue').forEach(v => v.classList.toggle('active', v.id === 'vue-' + b.dataset.vue));
+}));
+$('synchro').addEventListener('click', synchroniser);
+$('fichier-import').addEventListener('change', ev => { if (ev.target.files[0]) importerFichier(ev.target.files[0]); });
+$('filtre-histo').addEventListener('input', dessinerHisto);
+$('vue-devis').addEventListener('click', ev => {
+  const b = ev.target.closest('button'); if (!b) return;
+  if (b.id === 'reprise') return choisirReprise();
+  if (b.dataset.pdf) sortir(devisPour(b.dataset.pdf), 'pdf');
+  if (b.dataset.xls) sortir(devisPour(b.dataset.xls), 'xls');
+  if (b.dataset.detail) detail(b.dataset.detail);
+  if (b.dataset.envoye) marquerEnvoye(b.dataset.envoye);
+  if (b.dataset.suppr) supprimer(b.dataset.suppr);
+});
+$('corps-histo').addEventListener('click', ev => {
+  const b = ev.target.closest('button'); if (!b) return;
+  const r = id => S.registre.find(x => x.id === id);
+  if (b.dataset.hpdf) sortir(devisHisto(r(b.dataset.hpdf)), 'pdf');
+  if (b.dataset.hxls) sortir(devisHisto(r(b.dataset.hxls)), 'xls');
+  if (b.dataset.brouillon) remettreBrouillon(b.dataset.brouillon);
+});
+window.addEventListener('beforeunload', ev => { if (BPU_EDIT || MOTS_EDIT || PARAM_EDIT) { ev.preventDefault(); ev.returnValue = ''; } });
+
+/* ---------- Connexion ---------- */
+FB.init(CONFIG.firebase);
+function montrer(connecte) {
+  $('nav').style.display = connecte ? '' : 'none';
+  if (!connecte) { document.querySelectorAll('.vue').forEach(v => v.classList.toggle('active', v.id === 'vue-connexion')); return; }
+  document.querySelectorAll('.vue').forEach(v => v.classList.toggle('active', v.id === 'vue-' + (document.querySelector('nav button.actif').dataset.vue)));
+}
+$('c-ok').addEventListener('click', () => FB.login($('c-email').value, $('c-mdp').value).catch(e => { $('c-msg').textContent = e.message; }));
+$('c-mdp').addEventListener('keydown', e => { if (e.key === 'Enter') $('c-ok').click(); });
+$('c-oubli').addEventListener('click', () => FB.resetPw($('c-email').value).then(() => { $('c-msg').textContent = 'Lien de réinitialisation envoyé.'; }, e => { $('c-msg').textContent = e.message; }));
+
+FB.onAuth(a => {
+  if (a.etat !== 'ok') {
+    FB.stop(); montrer(false);
+    $('c-msg').textContent = a.etat === 'non-verifie' ? 'Adresse non vérifiée : ouvrez le lien reçu par e-mail (appli Équipe, « Première connexion »).'
+      : a.etat === 'sans-acces' ? 'Le compte ' + a.email + ' n\'a pas accès : demandez à un responsable de vous ajouter dans l\'appli Équipe.' : '';
+    if (a.etat !== 'deconnecte') $('boite-connexion').insertAdjacentHTML('beforeend', '');
+    return;
+  }
+  montrer(true);
+  $('pied').innerHTML = 'Connecté : ' + esc(a.nom) + ' · GL events Lyon – Eurexpo Lyon · <span class="lien" id="deco">se déconnecter</span>';
+  $('deco').onclick = () => FB.logout();
+  FB.start((nom, val) => {
+    S[nom] = val; S.charge[nom] = true;
+    if (nom === 'bpu') OPTS = null;
+    dessiner();
+  }, msg => toast(msg, true));
+});
+</script>
+</body>
+</html>
