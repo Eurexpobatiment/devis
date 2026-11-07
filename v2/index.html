@@ -92,7 +92,7 @@
 
 <main>
   <section id="vue-connexion" class="vue active">
-    <div class="connexion" id="boite-connexion">
+    <div class="connexion" id="boite-connexion" style="visibility:hidden"><!-- affichée seulement si personne n'est connecté (évite l'écran de connexion au démarrage) -->
       <h2>Connexion</h2>
       <p class="aide">Même compte que l'appli Équipe (adresse e-mail et mot de passe).</p>
       <input id="c-email" type="email" placeholder="Adresse e-mail" autocomplete="username">
@@ -195,7 +195,7 @@ const CONFIG = {
 };
 /* ========================== */
 
-import * as FB from './fb.js?v=2';
+import * as FB from './fb.js?v=3';
 import * as L from './logic.js?v=1';
 import * as OUT from './sortie.js?v=1';
 
@@ -650,7 +650,7 @@ $('c-oubli').addEventListener('click', () => FB.resetPw($('c-email').value).then
 
 FB.onAuth(a => {
   if (a.etat !== 'ok') {
-    FB.stop(); montrer(false);
+    FB.stop(); montrer(false); $('boite-connexion').style.visibility = '';
     $('c-msg').textContent = a.etat === 'non-verifie' ? 'Adresse non vérifiée : ouvrez le lien reçu par e-mail (appli Équipe, « Première connexion »).'
       : a.etat === 'sans-acces' ? 'Le compte ' + a.email + ' n\'a pas accès : demandez à un responsable de vous ajouter dans l\'appli Équipe.'
       : a.etat === 'erreur' ? 'Connecté (' + a.email + '), mais la vérification des droits a échoué : ' + a.err + '. ' : '';

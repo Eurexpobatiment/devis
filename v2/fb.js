@@ -10,8 +10,8 @@ const unsub = [];
 
 export function init(cfg) {
   app = initializeApp(cfg);
-  auth = A.getAuth(app);
-  A.setPersistence(auth, A.browserLocalPersistence).catch(() => {});
+  // Connexion partagée entre toutes les applis eurexpobatiment.github.io : même rangement partout (sinon elles se « volent » la session)
+  try { auth = A.initializeAuth(app, { persistence: [A.browserLocalPersistence, A.indexedDBLocalPersistence] }); } catch (e) { auth = A.getAuth(app); }
   try {
     db = F.initializeFirestore(app, { ignoreUndefinedProperties: true,
       localCache: F.persistentLocalCache({ tabManager: F.persistentMultipleTabManager() }) });
@@ -42,7 +42,7 @@ export function onAuth(cb) {
   let accUnsub = null;
   A.onAuthStateChanged(auth, async u => {
     if (accUnsub) { accUnsub(); accUnsub = null; }
-    if (!u) { me = ''; meEmail = ''; return cb({ etat: 'deconnecte' }); }
+    if (!u || u.isAnonymous) { me = ''; meEmail = ''; return cb({ etat: 'deconnecte' }); } // anonyme = session des applis de saisie
     meEmail = String(u.email || '').toLowerCase();
     if (!u.emailVerified) {
       await u.reload().catch(() => {});
