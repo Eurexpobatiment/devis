@@ -195,7 +195,7 @@ const CONFIG = {
 };
 /* ========================== */
 
-import * as FB from './fb.js?v=1';
+import * as FB from './fb.js?v=2';
 import * as L from './logic.js?v=1';
 import * as OUT from './sortie.js?v=1';
 
@@ -652,7 +652,12 @@ FB.onAuth(a => {
   if (a.etat !== 'ok') {
     FB.stop(); montrer(false);
     $('c-msg').textContent = a.etat === 'non-verifie' ? 'Adresse non vérifiée : ouvrez le lien reçu par e-mail (appli Équipe, « Première connexion »).'
-      : a.etat === 'sans-acces' ? 'Le compte ' + a.email + ' n\'a pas accès : demandez à un responsable de vous ajouter dans l\'appli Équipe.' : '';
+      : a.etat === 'sans-acces' ? 'Le compte ' + a.email + ' n\'a pas accès : demandez à un responsable de vous ajouter dans l\'appli Équipe.'
+      : a.etat === 'erreur' ? 'Connecté (' + a.email + '), mais la vérification des droits a échoué : ' + a.err + '. ' : '';
+    if (a.etat === 'erreur') {
+      const b = document.createElement('span'); b.className = 'lien'; b.textContent = 'Réessayer';
+      b.onclick = () => FB.recharger(); $('c-msg').appendChild(b);
+    }
     if (a.etat !== 'deconnecte') $('boite-connexion').insertAdjacentHTML('beforeend', '');
     return;
   }

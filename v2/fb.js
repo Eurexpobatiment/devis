@@ -51,13 +51,23 @@ export function onAuth(cb) {
     try { const r = await u.getIdTokenResult(); if (r.claims.email_verified !== true) await u.getIdToken(true); } catch (e) {}
     let essai = 0, dejaOk = false;
     const ecoute = () => {
-      accUnsub = F.onSnapshot(F.doc(db, 'Acces', meEmail), s => {
+      accUnsub = F.onSnapshot(F.doc(db, 'Acces', meEmail), { includeMetadataChanges: true }, s => {
         const a = s.exists() ? s.data() : null;
-        if (a && a.actif !== 'non') { me = a.nom; if (!dejaOk) { dejaOk = true; cb({ etat: 'ok', email: meEmail, nom: me }); } }
-        else { dejaOk = false; cb({ etat: 'sans-acces', email: meEmail }); }
+        if (a && a.actif !== 'non') { essai = 0; me = a.nom; if (!dejaOk) { dejaOk = true; cb({ etat: 'ok', email: meEmail, nom: me }); } return; }
+        // Fiche absente du cache local : on attend la réponse du serveur avant de conclure
+        if (!a && s.metadata.fromCache) return;
+        dejaOk = false; cb({ etat: 'sans-acces', email: meEmail });
       }, async e => {
-        if (e.code === 'permission-denied' && !essai++) { await u.getIdToken(true).catch(() => {}); return ecoute(); }
-        cb({ etat: 'sans-acces', email: meEmail, err: errMsg(e) });
+        accUnsub = null;
+        // Erreur passagère (jeton pas encore à jour, réseau…) : jusqu'à 3 nouvelles tentatives
+        if (essai < 3) {
+          essai++;
+          if (e.code === 'permission-denied' || e.code === 'unauthenticated') await u.getIdToken(true).catch(() => {});
+          await new Promise(r => setTimeout(r, 800 * essai));
+          if (auth.currentUser === u) return ecoute();
+          return;
+        }
+        dejaOk = false; cb({ etat: 'erreur', email: meEmail, err: errMsg(e) });
       });
     };
     ecoute();
@@ -66,6 +76,9 @@ export function onAuth(cb) {
 
 /* ---------- Données en direct ---------- */
 export function stop() { while (unsub.length) { try { unsub.pop()(); } catch (e) {} } }
+
+// Relancer la vérification d'accès (bouton « Réessayer »)
+export const recharger = () => location.reload();
 
 // onData(nom, valeur) : 'bpu' (liste), 'reserves' (liste), 'registre' (liste), 'config', 'mots', 'meta' (objets)
 export function start(onData, onErr) {
