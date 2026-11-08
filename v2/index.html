@@ -179,7 +179,7 @@
         <th style="width:150px" data-tri="plan"><span class="tri">Hall / zone<i></i></span><select class="filtre-col" data-f="plan"></select></th>
         <th style="width:150px" data-tri="constat"><span class="tri">Constat<i></i></span><input class="filtre-col" data-f="constat" placeholder="filtrer"></th>
         <th style="width:180px" data-tri="obs"><span class="tri">Observations<i></i></span><input class="filtre-col" data-f="obs" placeholder="filtrer"></th>
-        <th style="width:100px" data-tri="code"><span class="tri">Code<i></i></span><select class="filtre-col" data-f="code"></select></th>
+        <th style="width:100px" data-tri="code"><span class="tri">Code<i></i></span><input class="filtre-col" data-f="code" placeholder="filtrer" list="liste-codes"><datalist id="liste-codes"></datalist></th>
         <th style="" data-tri="des"><span class="tri">Désignation<i></i></span><input class="filtre-col" data-f="des" placeholder="filtrer"></th>
         <th class="num" style="width:76px" data-tri="qte"><span class="tri">Qté<i></i></span><input class="filtre-col" data-f="qte" placeholder="="></th>
         <th class="num" style="width:100px" data-tri="pu"><span class="tri">PU HT<i></i></span><input class="filtre-col" data-f="pu" placeholder="filtrer"></th>
@@ -464,22 +464,21 @@ const FILTRES = () => [...$('modale-tete').querySelectorAll('.filtre-col')];
 function remplirFiltres() {
   const opt = (v, t) => '<option value="' + esc(v) + '">' + esc(t) + '</option>';
   const plans = [...new Set(MOD.lignes.map(l => l.plan || ''))].sort((a, b) => a.localeCompare(b, 'fr', { numeric: true }));
-  const codes = [...new Set(MOD.lignes.map(l => l.choix).filter(Boolean))].sort();
+  const B = bpuParCode(), codes = [...new Set(MOD.lignes.map(l => l.choix).filter(Boolean))].sort();
+  $('liste-codes').innerHTML = codes.map(c => '<option value="' + esc(c) + '">' + esc(B[c] ? B[c].des : '') + '</option>').join('') + '<option value="Non classé"></option>';
   FILTRES().forEach(f => {
     if (f.dataset.f === 'plan') f.innerHTML = opt('', 'tous') + plans.map(p => p ? opt(p, p) : opt('__vide', '(sans hall)')).join('');
-    else if (f.dataset.f === 'code') f.innerHTML = opt('', 'tous') + codes.map(c => opt(c, c)).join('') + opt('__nc', 'Non classé');
     else f.value = '';
     f.classList.remove('actif');
   });
 }
-function filtreActifs() { const o = {}; FILTRES().forEach(f => { if (f.value) o[f.dataset.f] = f.dataset.f === 'plan' || f.dataset.f === 'code' ? f.value : L.norm(f.value); }); return o; }
+function filtreActifs() { const o = {}; FILTRES().forEach(f => { if (f.value) o[f.dataset.f] = f.dataset.f === 'plan' ? f.value : L.norm(f.value); }); return o; }
 function garde(l, F, B, P) {
   const a = B[l.choix], pu = puDe(l, B, P), mt = montant(l, B, P);
-  const txt = { num: l.num, constat: l.constat, obs: l.obs, des: a ? a.des : 'Non classé', qte: l.qte,
+  const txt = { num: l.num, code: a ? l.choix : 'Non classé ' + (l.choix || ''), constat: l.constat, obs: l.obs, des: a ? a.des : 'Non classé', qte: l.qte,
     pu: pu === null ? '' : L.euros(pu), mt: mt === null ? '' : L.euros(mt) };
   for (const k in F) {
     if (k === 'plan') { if ((l.plan || '') !== (F.plan === '__vide' ? '' : F.plan)) return false; }
-    else if (k === 'code') { if (F.code === '__nc' ? !!a : l.choix !== F.code) return false; }
     else if (L.norm(txt[k]).indexOf(F[k]) < 0) return false;
   }
   return true;
