@@ -201,24 +201,140 @@ export async function pdf(d) {
   return blob;
 }
 
+/* Excel sur la trame du PDF (ExcelJS : couleurs, logo, sous-totaux par hall, formules) */
+async function exceljs() {
+  await script('https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js');
+  return window.ExcelJS;
+}
+const argb = h => 'FF' + h.replace('#', '').toUpperCase();
+const lignesTexte = (t, wch) => String(t == null ? '' : t).split('\n')
+  .reduce((n, p) => n + Math.max(1, Math.ceil(p.length / (wch * 1.1))), 0);
+
 export async function excel(d) {
-  const X = await sheetjs();
-  const rows = [
-    ['Devis N° ' + (d.num || '')], ['Remise en état suite au salon ' + d.salon], [],
-    ['Date', d.date || ''], ['Salon', d.salon], ['N° devis', d.num || ''], [],
-    ['N° réserve', 'Hall / zone', 'Constat', 'Observations', 'Code BPU', 'Désignation', 'Unité', 'Qté', 'PU HT', 'Montant HT']
-  ];
-  parHall(d.lignes).forEach(l => rows.push([l.num, l.plan || '', l.constat || '', l.obs || '', l.connu ? l.code : '',
-    l.connu ? l.des : '⚠ Non classé', l.unite || '', l.qte, l.pu, l.mt]));
-  rows.push([], ['', '', '', '', '', '', '', 'Total HT', '', d.ht], ['', '', '', '', '', '', '', 'TVA', '', d.tva], ['', '', '', '', '', '', '', 'Total TTC', '', d.ttc]);
-  rows.push([], ['Récapitulatif par hall'], ['', '', '', '', '', 'Hall / zone', '', 'Réserves', '', 'Montant HT']);
-  groupes(d.lignes).forEach(G => rows.push(['', '', '', '', '', G.nom, '', G.n, '', G.ht]));
-  const ws = X.utils.aoa_to_sheet(rows);
-  ws['!autofilter'] = { ref: 'A8:J' + (8 + d.lignes.length) }; // filtres sur chaque colonne du tableau
-  ws['!cols'] = [10, 18, 26, 32, 9, 44, 8, 6, 11, 12].map(w => ({ wch: w }));
-  for (let r = 8; r < rows.length; r++) ['I', 'J'].forEach(c => { const x = ws[c + (r + 1)]; if (x && typeof x.v === 'number') x.z = '#,##0.00 "€"'; });
-  const wb = X.utils.book_new();
-  X.utils.book_append_sheet(wb, ws, 'Devis');
-  const out = X.write(wb, { bookType: 'xlsx', type: 'array' });
-  return new Blob([out], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const EJ = await exceljs();
+  const logo = await image('logo.png');
+  const dim = await new Promise(ok => { const i = new Image(); i.onload = () => ok({ w: i.naturalWidth, h: i.naturalHeight }); i.onerror = () => ok({ w: 3, h: 1 }); i.src = logo; });
+  const amp = t => String(t || '').replace(/&/g, '&&');
+  const wb = new EJ.Workbook(); wb.creator = EMETTEUR;
+  const ws = wb.addWorksheet('Devis', {
+    properties: { tabColor: { argb: argb(C.vert) } },
+    pageSetup: { paperSize: 9, orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0,
+      margins: { left: 0.4, right: 0.3, top: 0.4, bottom: 0.5, header: 0.2, footer: 0.25 } },
+    headerFooter: { oddFooter: '&L&8Devis ' + amp(d.num) + ' – ' + amp(d.salon) + '&R&8Page &P / &N' }
+  });
+  const W = [8, 18, 24, 30, 8, 38, 7, 6, 12, 13];
+  ws.columns = W.map(w => ({ width: w }));
+  const F = (o) => Object.assign({ name: 'Arial', size: 9, color: { argb: argb(C.texte) } }, o);
+  const fond = h => ({ type: 'pattern', pattern: 'solid', fgColor: { argb: argb(h) } });
+  const EUR = '#,##0.00 "€"';
+  const trait = { style: 'thin', color: { argb: 'FFE7E5E4' } };
+
+  // En-tête du devis
+  ws.getCell('A1').value = 'Devis N° ' + (d.num || '—'); ws.getCell('A1').font = F({ size: 18, bold: true, color: { argb: argb(C.fonce) } });
+  ws.getRow(1).height = 28;
+  ws.getCell('A2').value = 'Remise en état suite au salon ' + d.salon; ws.getCell('A2').font = F({ size: 10 });
+  ['A3', 'B3', 'C3'].forEach(c => { ws.getCell(c).border = { bottom: { style: 'medium', color: { argb: argb(C.accent) } } }; });
+  ws.getRow(3).height = 6;
+  [['Date', d.date || ''], ['Salon', d.salon], ['N° devis', d.num || '']].forEach((x, i) => {
+    const r = 5 + i; ws.getCell('A' + r).value = x[0]; ws.getCell('A' + r).font = F({ bold: true, size: 8.5 });
+    ws.getCell('B' + r).value = x[1]; ws.getCell('B' + r).font = F({ size: 8.5 });
+  });
+  ws.getCell('J5').value = EMETTEUR; ws.getCell('J6').value = SITES;
+  ['J5', 'J6'].forEach(c => { ws.getCell(c).font = F({ size: 7 }); ws.getCell(c).alignment = { horizontal: 'right' }; });
+  const lw = 150;
+  ws.addImage(wb.addImage({ base64: logo, extension: 'png' }), { tl: { col: 8.2, row: 0.15 }, ext: { width: lw, height: lw * dim.h / dim.w } });
+  const alertes = [];
+  if (d.nc) alertes.push(d.nc + ' réserve(s) non classée(s)');
+  if (d.sansPu) alertes.push(d.sansPu + ' réserve(s) sans prix unitaire');
+  if (alertes.length) { ws.getCell('A8').value = 'Attention : ' + alertes.join(' – '); ws.getCell('A8').font = F({ bold: true, size: 8.5, color: { argb: argb(C.alerte) } }); }
+
+  // Tableau
+  const hr = 10;
+  const th = ws.getRow(hr);
+  th.values = ['N°\nréserve', 'Hall / zone', 'Constat', 'Observations', 'Code\nBPU', 'Désignation', 'Unité', 'Qté', 'PU HT', 'Montant HT'];
+  th.height = 28;
+  th.eachCell(c => { c.fill = fond(C.fonce); c.font = F({ bold: true, color: { argb: 'FFFFFFFF' } }); c.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true }; });
+
+  let r = hr, k = 0;
+  const stot = [];
+  groupes(d.lignes).forEach(G => {
+    const debut = r + 1;
+    G.lignes.forEach(l => {
+      r++; k++;
+      const nc = !l.connu, row = ws.getRow(r);
+      const n = Number(l.num);
+      row.values = [isNaN(n) || l.num === '' ? l.num : n, l.plan || '', l.constat || '', l.obs || '', nc ? '' : l.code,
+        nc ? 'Non classé' : (l.des || ''), l.unite || '', l.qte,
+        l.pu === null ? (nc ? '' : 'à saisir') : l.pu,
+        l.pu === null || nc ? null : { formula: 'H' + r + '*I' + r, result: l.mt }];
+      for (let c = 1; c <= 10; c++) {
+        const x = row.getCell(c);
+        x.font = F(); x.border = { bottom: trait };
+        x.alignment = { vertical: 'middle', wrapText: true, horizontal: [5, 7, 8].indexOf(c) >= 0 ? 'center' : (c >= 9 ? 'right' : 'left') };
+        if (k % 2 === 0) x.fill = fond(C.clair);
+      }
+      row.getCell(9).numFmt = EUR; row.getCell(10).numFmt = EUR;
+      if (nc) row.getCell(6).font = F({ bold: true, color: { argb: argb(C.alerte) } });
+      if (l.pu === null && !nc) row.getCell(9).font = F({ color: { argb: argb(C.alerte) } });
+      row.height = Math.max(16, 3 + 11.5 * Math.max(...[2, 3, 4, 6].map(c => lignesTexte(row.getCell(c).value, W[c - 1]))));
+    });
+    r++;
+    const row = ws.getRow(r);
+    ws.mergeCells('A' + r + ':I' + r);
+    row.getCell(1).value = 'Sous-total ' + G.nom + ' (' + G.n + ' réserve' + (G.n > 1 ? 's' : '') + ')';
+    row.getCell(10).value = { formula: 'SUM(J' + debut + ':J' + (r - 1) + ')', result: G.ht };
+    [1, 10].forEach(c => {
+      const x = row.getCell(c);
+      x.fill = fond('#E6F6F2'); x.font = F({ bold: true, color: { argb: argb(C.fonce) } });
+      x.alignment = { horizontal: 'right', vertical: 'middle' };
+      x.border = { top: { style: 'thin', color: { argb: argb(C.vert) } }, bottom: { style: 'thin', color: { argb: argb(C.vert) } } };
+    });
+    row.getCell(10).numFmt = EUR; row.height = 17;
+    stot.push('J' + r);
+  });
+  const fin = r;
+  ws.autoFilter = 'A' + hr + ':J' + fin;
+  ws.views = [{ state: 'frozen', ySplit: hr, showGridLines: false }];
+  ws.pageSetup.printTitlesRow = hr + ':' + hr;
+
+  // Totaux
+  r += 2;
+  const rHt = r, taux = String(Math.round(d.taux * 1000) / 10).replace('.', ',');
+  [['Total HT', { formula: stot.length ? stot.join('+') : '0', result: d.ht }, true],
+   ['TVA ' + taux + ' %', { formula: 'ROUND(J' + rHt + '*' + d.taux + ',2)', result: d.tva }, false],
+   ['Total TTC', { formula: 'J' + rHt + '+J' + (rHt + 1), result: d.ttc }, true]].forEach((t, i) => {
+    const y = rHt + i;
+    ws.mergeCells('G' + y + ':I' + y);
+    const a = ws.getCell('G' + y), v = ws.getCell('J' + y);
+    a.value = t[0]; v.value = t[1]; v.numFmt = EUR;
+    a.font = F({ bold: t[2], size: 9.5 }); v.font = F({ bold: t[2], size: 9.5 });
+    a.alignment = { horizontal: 'right' }; v.alignment = { horizontal: 'right' };
+    if (i === 2) [a, v].forEach(x => { x.border = { top: { style: 'thin', color: { argb: argb(C.fonce) } } }; });
+  });
+  r = rHt + 4;
+  ['Prix unitaires HT issus du bordereau de prix (BPU) remise en état après salon.',
+   'Réserves relevées dans BatiScript' + (d.source ? ' – ' + d.source : '') + '.'].forEach(t => {
+    r++; ws.getCell('A' + r).value = t; ws.getCell('A' + r).font = F({ size: 7.5, italic: true });
+  });
+
+  // Récapitulatif par hall (2e onglet)
+  const rc = wb.addWorksheet('Récap par hall', { properties: { tabColor: { argb: argb(C.fonce) } }, views: [{ showGridLines: false }] });
+  rc.columns = [{ width: 34 }, { width: 12 }, { width: 16 }];
+  rc.getCell('A1').value = 'Récapitulatif par hall – ' + (d.num || '') + ' – ' + d.salon;
+  rc.getCell('A1').font = F({ size: 13, bold: true, color: { argb: argb(C.fonce) } });
+  const h = rc.getRow(3); h.values = ['Hall / zone', 'Réserves', 'Montant HT'];
+  h.eachCell(c => { c.fill = fond(C.fonce); c.font = F({ bold: true, color: { argb: 'FFFFFFFF' } }); c.alignment = { horizontal: 'center' }; });
+  let y = 3;
+  groupes(d.lignes).forEach((G, i) => {
+    y++; const row = rc.getRow(y); row.values = [G.nom, G.n, G.ht];
+    row.eachCell(c => { c.font = F(); c.border = { bottom: trait }; if (i % 2) c.fill = fond(C.clair); });
+    row.getCell(2).alignment = { horizontal: 'center' }; row.getCell(3).numFmt = EUR;
+  });
+  y++; const tot = rc.getRow(y);
+  tot.values = ['Total', { formula: 'SUM(B4:B' + (y - 1) + ')', result: d.n }, { formula: 'SUM(C4:C' + (y - 1) + ')', result: d.ht }];
+  tot.eachCell(c => { c.font = F({ bold: true, color: { argb: argb(C.fonce) } }); c.fill = fond('#E6F6F2'); });
+  tot.getCell(2).alignment = { horizontal: 'center' }; tot.getCell(3).numFmt = EUR;
+
+  const buf = await wb.xlsx.writeBuffer();
+  return new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
 }
