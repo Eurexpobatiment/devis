@@ -38,6 +38,24 @@ function cleHall(plan) {
   const m = /hall\s*(\d+)(?:\.(\d+))?/i.exec(p);
   return m ? [0, Number(m[1]), Number(m[2] || 0), /^\s*hall/i.test(p) ? 0 : 1] : [p ? 1 : 2, 0, 0, 0];
 }
+// Groupe de sous-total : le hall (« Sanitaires Hall 3.2 latéral » → Hall 3.2), sinon la zone elle-même
+export function groupeHall(plan) {
+  const p = String(plan || '').trim();
+  const m = /hall\s*(\d+)(?:\.(\d+))?/i.exec(p);
+  return m ? 'Hall ' + m[1] + (m[2] ? '.' + m[2] : '') : (p || 'Sans zone');
+}
+// Lignes rangées par hall, découpées en groupes { nom, lignes, n, ht }
+export function groupes(lignes) {
+  const out = [];
+  parHall(lignes).forEach(l => {
+    const g = groupeHall(l.plan);
+    let G = out[out.length - 1];
+    if (!G || G.nom !== g) out.push(G = { nom: g, lignes: [], n: 0, ht: 0 });
+    G.lignes.push(l); G.n++; if (l.mt !== null && l.mt !== undefined) G.ht += l.mt;
+  });
+  out.forEach(G => { G.ht = Math.round(G.ht * 100) / 100; });
+  return out;
+}
 export function parHall(lignes) {
   return lignes.slice().sort((a, b) => {
     const x = cleHall(a.plan), y = cleHall(b.plan);
@@ -126,7 +144,8 @@ export async function pdf(d) {
   const th = t => ({ text: t, bold: true, color: '#FFFFFF', fillColor: C.fonce, alignment: 'center', fontSize: 8.5 });
   const corps = [[th('N°\nréserve'), th('Hall / zone'), th('Constat'), th('Observations'), th('Code\nBPU'), th('Désignation'),
     th('Unité'), th('Qté'), th('PU HT'), th('Montant HT')]];
-  parHall(d.lignes).forEach(l => {
+  const stot = [];
+  groupes(d.lignes).forEach(G => { G.lignes.forEach(l => {
     const nc = !l.connu;
     corps.push([
       l.num, l.plan || '', l.constat || '', l.obs || '',
@@ -137,6 +156,11 @@ export async function pdf(d) {
       { text: l.pu === null ? (nc ? '' : 'à saisir') : euros(l.pu), alignment: 'right', color: l.pu === null && !nc ? C.alerte : undefined },
       { text: l.mt === null ? '' : euros(l.mt), alignment: 'right' }
     ]);
+  });
+    const f = { fillColor: '#E6F6F2', bold: true, color: C.fonce };
+    stot.push(corps.length);
+    corps.push([Object.assign({ text: 'Sous-total ' + G.nom + ' (' + G.n + ' réserve' + (G.n > 1 ? 's' : '') + ')', colSpan: 9, alignment: 'right' }, f),
+      '', '', '', '', '', '', '', '', Object.assign({ text: euros(G.ht), alignment: 'right' }, f)]);
   });
   const total = (lib, v, gras) => [{ text: lib, colSpan: 2, bold: gras, alignment: 'right' }, '', { text: euros(v), bold: gras, alignment: 'right' }];
 
@@ -162,7 +186,7 @@ export async function pdf(d) {
       { table: { headerRows: 1, dontBreakRows: true, widths: [34, 62, 108, 128, 34, 160, 30, 26, 54, 62], body: corps },
         layout: {
           fillColor: (i) => i > 0 && i % 2 === 0 ? C.clair : null,
-          hLineWidth: (i) => i === 0 ? 0 : 0.4, vLineWidth: () => 0, hLineColor: () => '#E7E5E4',
+          hLineWidth: (i) => i === 0 ? 0 : (stot.indexOf(i) >= 0 || stot.indexOf(i - 1) >= 0 ? 0.8 : 0.4), vLineWidth: () => 0, hLineColor: () => '#E7E5E4',
           paddingTop: () => 4, paddingBottom: () => 4
         } },
       { columns: [{ width: '*', text: '' }, { width: 230, table: { widths: [70, 70, 80], body: [
@@ -187,6 +211,8 @@ export async function excel(d) {
   parHall(d.lignes).forEach(l => rows.push([l.num, l.plan || '', l.constat || '', l.obs || '', l.connu ? l.code : '',
     l.connu ? l.des : '⚠ Non classé', l.unite || '', l.qte, l.pu, l.mt]));
   rows.push([], ['', '', '', '', '', '', '', 'Total HT', '', d.ht], ['', '', '', '', '', '', '', 'TVA', '', d.tva], ['', '', '', '', '', '', '', 'Total TTC', '', d.ttc]);
+  rows.push([], ['Récapitulatif par hall'], ['', '', '', '', '', 'Hall / zone', '', 'Réserves', '', 'Montant HT']);
+  groupes(d.lignes).forEach(G => rows.push(['', '', '', '', '', G.nom, '', G.n, '', G.ht]));
   const ws = X.utils.aoa_to_sheet(rows);
   ws['!autofilter'] = { ref: 'A8:J' + (8 + d.lignes.length) }; // filtres sur chaque colonne du tableau
   ws['!cols'] = [10, 18, 26, 32, 9, 44, 8, 6, 11, 12].map(w => ({ wch: w }));
