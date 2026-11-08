@@ -30,6 +30,22 @@ async function image(nom) {
   return images[nom] = await new Promise(ok => { const r = new FileReader(); r.onload = () => ok(r.result); r.readAsDataURL(b); });
 }
 
+/* Ordre des halls : n° de hall trouvé dans la zone (« Hall 2.1 BC », « Sanitaires Hall 3.2 latéral »),
+ * puis les zones sans hall (accueil, extérieurs…) par ordre alphabétique ; ensuite code BPU puis n° de réserve */
+const cmpTxt = (a, b) => String(a || '').localeCompare(String(b || ''), 'fr', { numeric: true, sensitivity: 'base' });
+function cleHall(plan) {
+  const p = String(plan || '');
+  const m = /hall\s*(\d+)(?:\.(\d+))?/i.exec(p);
+  return m ? [0, Number(m[1]), Number(m[2] || 0), /^\s*hall/i.test(p) ? 0 : 1] : [p ? 1 : 2, 0, 0, 0];
+}
+export function parHall(lignes) {
+  return lignes.slice().sort((a, b) => {
+    const x = cleHall(a.plan), y = cleHall(b.plan);
+    for (let i = 0; i < 4; i++) if (x[i] !== y[i]) return x[i] - y[i];
+    return cmpTxt(a.plan, b.plan) || ((!a.connu) - (!b.connu)) || cmpTxt(a.code, b.code) || (Number(a.num) - Number(b.num));
+  });
+}
+
 export const nomFichier = (d, ext) =>
   (d.num ? d.num + ' - ' : '') + 'Devis réserves - ' + String(d.salon).replace(/[\\/:*?"<>|]/g, ' ') + '.' + ext;
 
@@ -110,7 +126,7 @@ export async function pdf(d) {
   const th = t => ({ text: t, bold: true, color: '#FFFFFF', fillColor: C.fonce, alignment: 'center', fontSize: 8.5 });
   const corps = [[th('N°\nréserve'), th('Hall / zone'), th('Constat'), th('Observations'), th('Code\nBPU'), th('Désignation'),
     th('Unité'), th('Qté'), th('PU HT'), th('Montant HT')]];
-  d.lignes.forEach(l => {
+  parHall(d.lignes).forEach(l => {
     const nc = !l.connu;
     corps.push([
       l.num, l.plan || '', l.constat || '', l.obs || '',
@@ -168,7 +184,7 @@ export async function excel(d) {
     ['Date', d.date || ''], ['Salon', d.salon], ['N° devis', d.num || ''], [],
     ['N° réserve', 'Hall / zone', 'Constat', 'Observations', 'Code BPU', 'Désignation', 'Unité', 'Qté', 'PU HT', 'Montant HT']
   ];
-  d.lignes.forEach(l => rows.push([l.num, l.plan || '', l.constat || '', l.obs || '', l.connu ? l.code : '',
+  parHall(d.lignes).forEach(l => rows.push([l.num, l.plan || '', l.constat || '', l.obs || '', l.connu ? l.code : '',
     l.connu ? l.des : '⚠ Non classé', l.unite || '', l.qte, l.pu, l.mt]));
   rows.push([], ['', '', '', '', '', '', '', 'Total HT', '', d.ht], ['', '', '', '', '', '', '', 'TVA', '', d.tva], ['', '', '', '', '', '', '', 'Total TTC', '', d.ttc]);
   const ws = X.utils.aoa_to_sheet(rows);

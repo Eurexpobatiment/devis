@@ -62,6 +62,9 @@
   .boite .tableau { max-height: none; flex: 1; border: 1px solid var(--ligne); }
   .filtre-col { display: block; width: 100%; margin-top: 5px; font: 400 12px Lato, Arial, sans-serif; color: var(--encre); border: 0; border-radius: 4px; padding: 4px 5px; background: var(--blanc); }
   .filtre-col.actif { background: var(--jaune); }
+  #modale-tete th { position: sticky; } #modale-corps td { overflow-wrap: anywhere; }
+  .poignee { position: absolute; top: 0; right: 0; width: 8px; height: 100%; cursor: col-resize; }
+  .poignee:hover, .poignee.tire { background: rgba(255,255,255,.35); border-right: 2px solid var(--orange); }
   th .tri { cursor: pointer; user-select: none; } th .tri:hover { text-decoration: underline; }
   th .tri i { font-style: normal; margin-left: 4px; color: var(--orange); }
   .attente { display: none; position: fixed; inset: 0; background: rgba(255,255,255,.75); z-index: 30; align-items: center; justify-content: center; flex-direction: column; gap: 14px; text-align: center; padding: 20px; }
@@ -187,7 +190,7 @@
       </tr></thead>
       <tbody id="modale-corps"></tbody>
     </table></div>
-    <p class="aide">Filtres : sous chaque en-tête (texte contenu, sans tenir compte des majuscules ni des accents) ; <span class="lien" id="filtres-raz">effacer les filtres</span>. Tri : cliquez sur le nom d'une colonne (▲ croissant, ▼ décroissant, 3e clic = ordre du devis). PU vide = prix du BPU. Un prix saisi ici ne concerne que cette réserve et prime sur le BPU ; il est conservé aux prochaines synchronisations, comme le code forcé et la quantité.</p>
+    <p class="aide">Filtres : sous chaque en-tête (texte contenu, sans tenir compte des majuscules ni des accents) ; <span class="lien" id="filtres-raz">effacer les filtres</span>. Largeur : faites glisser le bord droit d'un en-tête. Tri : cliquez sur le nom d'une colonne (▲ croissant, ▼ décroissant, 3e clic = ordre du devis). PU vide = prix du BPU. Un prix saisi ici ne concerne que cette réserve et prime sur le BPU ; il est conservé aux prochaines synchronisations, comme le code forcé et la quantité.</p>
   </div>
 </div>
 <div class="attente" id="attente"><div class="rond"></div><div id="attente-msg"></div></div>
@@ -211,7 +214,7 @@ const CONFIG = {
 
 import * as FB from './fb.js?v=3';
 import * as L from './logic.js?v=1';
-import * as OUT from './sortie.js?v=2';
+import * as OUT from './sortie.js?v=3';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -526,6 +529,34 @@ function ligneHtml(l, i, B, P) {
     '<td class="num"><input type="number" min="0" step="0.01" data-c="puForce" class="' + (a && puB === null && (l.puForce === null || l.puForce === '') ? 'vide-pu' : '') + '" value="' + (l.puForce === null || l.puForce === undefined ? '' : esc(l.puForce)) + '" placeholder="' + (puB === null ? 'à saisir' : puB.toFixed(2)) + '"></td>' +
     '<td class="num">' + L.euros(mt) + '</td></tr>';
 }
+/* Largeur des colonnes : poignée à droite de chaque en-tête, double-clic = largeur d'origine (mémorisée sur ce poste) */
+const LARG_DEF = { num: 62, plan: 150, constat: 150, obs: 180, code: 100, des: 260, qte: 76, pu: 100, mt: 100 };
+const LARG = Object.assign({}, LARG_DEF);
+try { Object.assign(LARG, JSON.parse(localStorage.getItem('devis-largeurs') || '{}')); } catch (e) {}
+function appliquerLargeurs() {
+  let tot = 0;
+  $('modale-tete').querySelectorAll('th[data-tri]').forEach(th => { const w = LARG[th.dataset.tri]; th.style.width = w + 'px'; tot += w; });
+  const t = $('modale-tete').closest('table');
+  t.style.tableLayout = 'fixed'; t.style.width = tot + 'px'; t.style.minWidth = '100%';
+}
+const garderLargeurs = () => { try { localStorage.setItem('devis-largeurs', JSON.stringify(LARG)); } catch (e) {} };
+$('modale-tete').querySelectorAll('th[data-tri]').forEach(th => {
+  const g = document.createElement('span'); g.className = 'poignee'; g.title = 'Glisser pour régler la largeur (double-clic : largeur d\'origine)';
+  th.appendChild(g);
+  g.addEventListener('mousedown', ev => {
+    ev.preventDefault(); ev.stopPropagation();
+    const k = th.dataset.tri, x0 = ev.clientX, w0 = th.getBoundingClientRect().width;
+    g.classList.add('tire'); document.body.style.cursor = 'col-resize';
+    const bouge = e => { LARG[k] = Math.max(40, Math.round(w0 + e.clientX - x0)); appliquerLargeurs(); };
+    const lache = () => { document.removeEventListener('mousemove', bouge); document.removeEventListener('mouseup', lache);
+      g.classList.remove('tire'); document.body.style.cursor = ''; garderLargeurs(); };
+    document.addEventListener('mousemove', bouge); document.addEventListener('mouseup', lache);
+  });
+  g.addEventListener('click', ev => ev.stopPropagation());
+  g.addEventListener('dblclick', ev => { ev.stopPropagation(); LARG[th.dataset.tri] = LARG_DEF[th.dataset.tri]; appliquerLargeurs(); garderLargeurs(); });
+});
+appliquerLargeurs();
+
 /* Tri : clic sur un en-tête = croissant, 2e clic = décroissant, 3e clic = ordre du devis */
 let TRI = { col: '', sens: 1 };
 const videTri = v => v === null || v === undefined || v === '' || (typeof v === 'number' && isNaN(v));
