@@ -60,6 +60,8 @@
   .modale.ouverte { display: flex; }
   .boite { background: var(--blanc); border-radius: 12px; width: min(1250px, 100%); max-height: 94vh; display: flex; flex-direction: column; padding: 20px 22px; gap: 12px; }
   .boite .tableau { max-height: none; flex: 1; border: 1px solid var(--ligne); }
+  .filtre-col { display: block; width: 100%; margin-top: 5px; font: 400 12px Lato, Arial, sans-serif; color: var(--encre); border: 0; border-radius: 4px; padding: 4px 5px; background: var(--blanc); }
+  .filtre-col.actif { background: var(--jaune); }
   .attente { display: none; position: fixed; inset: 0; background: rgba(255,255,255,.75); z-index: 30; align-items: center; justify-content: center; flex-direction: column; gap: 14px; text-align: center; padding: 20px; }
   .attente.ouverte { display: flex; }
   .rond { width: 42px; height: 42px; border: 4px solid var(--ligne); border-top-color: var(--vert); border-radius: 50%; animation: t 1s linear infinite; }
@@ -170,10 +172,20 @@
       <div class="actions"><button class="btn plein" id="modale-sauver">Enregistrer</button><button class="btn" id="modale-fermer">Fermer</button></div>
     </div>
     <div class="tableau"><table>
-      <thead><tr><th style="width:52px">N°</th><th style="width:150px">Constat</th><th style="width:190px">Observations</th><th style="width:100px">Code</th><th>Désignation</th><th class="num" style="width:76px">Qté</th><th class="num" style="width:100px">PU HT</th><th class="num" style="width:100px">Montant HT</th></tr></thead>
+      <thead id="modale-tete"><tr>
+        <th style="width:62px">N°<input class="filtre-col" data-f="num" placeholder="filtrer"></th>
+        <th style="width:150px">Hall / zone<select class="filtre-col" data-f="plan"></select></th>
+        <th style="width:150px">Constat<input class="filtre-col" data-f="constat" placeholder="filtrer"></th>
+        <th style="width:180px">Observations<input class="filtre-col" data-f="obs" placeholder="filtrer"></th>
+        <th style="width:100px">Code<select class="filtre-col" data-f="code"></select></th>
+        <th>Désignation<input class="filtre-col" data-f="des" placeholder="filtrer"></th>
+        <th class="num" style="width:76px">Qté<input class="filtre-col" data-f="qte" placeholder="="></th>
+        <th class="num" style="width:100px">PU HT<input class="filtre-col" data-f="pu" placeholder="filtrer"></th>
+        <th class="num" style="width:100px">Montant HT<input class="filtre-col" data-f="mt" placeholder="filtrer"></th>
+      </tr></thead>
       <tbody id="modale-corps"></tbody>
     </table></div>
-    <p class="aide">PU vide = prix du BPU. Un prix saisi ici ne concerne que cette réserve et prime sur le BPU ; il est conservé aux prochaines synchronisations, comme le code forcé et la quantité.</p>
+    <p class="aide">Filtres : sous chaque en-tête (texte contenu, sans tenir compte des majuscules ni des accents) ; <span class="lien" id="filtres-raz">effacer les filtres</span>. PU vide = prix du BPU. Un prix saisi ici ne concerne que cette réserve et prime sur le BPU ; il est conservé aux prochaines synchronisations, comme le code forcé et la quantité.</p>
   </div>
 </div>
 <div class="attente" id="attente"><div class="rond"></div><div id="attente-msg"></div></div>
@@ -197,7 +209,7 @@ const CONFIG = {
 
 import * as FB from './fb.js?v=3';
 import * as L from './logic.js?v=1';
-import * as OUT from './sortie.js?v=1';
+import * as OUT from './sortie.js?v=2';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -440,15 +452,58 @@ function detail(s) {
   const d = CALC[s];
   MOD = { salon: s, lignes: d.lignes.map(l => Object.assign({}, l, { choix: l.code })) };
   $('modale-titre').textContent = s;
-  majSousTitre();
+  remplirFiltres();
   dessinerModale();
   $('modale').classList.add('ouverte');
 }
+
+/* Filtres par colonne (fenêtre « Voir les réserves ») */
+const FILTRES = () => [...$('modale-tete').querySelectorAll('.filtre-col')];
+function remplirFiltres() {
+  const opt = (v, t) => '<option value="' + esc(v) + '">' + esc(t) + '</option>';
+  const plans = [...new Set(MOD.lignes.map(l => l.plan || ''))].sort((a, b) => a.localeCompare(b, 'fr', { numeric: true }));
+  const codes = [...new Set(MOD.lignes.map(l => l.choix).filter(Boolean))].sort();
+  FILTRES().forEach(f => {
+    if (f.dataset.f === 'plan') f.innerHTML = opt('', 'tous') + plans.map(p => p ? opt(p, p) : opt('__vide', '(sans hall)')).join('');
+    else if (f.dataset.f === 'code') f.innerHTML = opt('', 'tous') + codes.map(c => opt(c, c)).join('') + opt('__nc', 'Non classé');
+    else f.value = '';
+    f.classList.remove('actif');
+  });
+}
+function filtreActifs() { const o = {}; FILTRES().forEach(f => { if (f.value) o[f.dataset.f] = f.dataset.f === 'plan' || f.dataset.f === 'code' ? f.value : L.norm(f.value); }); return o; }
+function garde(l, F, B, P) {
+  const a = B[l.choix], pu = puDe(l, B, P), mt = montant(l, B, P);
+  const txt = { num: l.num, constat: l.constat, obs: l.obs, des: a ? a.des : 'Non classé', qte: l.qte,
+    pu: pu === null ? '' : L.euros(pu), mt: mt === null ? '' : L.euros(mt) };
+  for (const k in F) {
+    if (k === 'plan') { if ((l.plan || '') !== (F.plan === '__vide' ? '' : F.plan)) return false; }
+    else if (k === 'code') { if (F.code === '__nc' ? !!a : l.choix !== F.code) return false; }
+    else if (L.norm(txt[k]).indexOf(F[k]) < 0) return false;
+  }
+  return true;
+}
+function appliquerFiltres() {
+  const F = filtreActifs(), B = bpuParCode(), P = param();
+  FILTRES().forEach(f => f.classList.toggle('actif', !!f.value));
+  $('modale-corps').querySelectorAll('tr[data-i]').forEach(tr => {
+    tr.style.display = garde(MOD.lignes[Number(tr.dataset.i)], F, B, P) ? '' : 'none';
+  });
+  majSousTitre();
+}
+$('modale-tete').addEventListener('input', appliquerFiltres);
+$('modale-tete').addEventListener('change', appliquerFiltres);
+$('filtres-raz').addEventListener('click', () => { remplirFiltres(); appliquerFiltres(); });
+
 function majSousTitre() {
-  const B = bpuParCode(), P = param();
-  let ht = 0; MOD.lignes.forEach(l => { const m = montant(l, B, P); if (m !== null) ht += m; });
+  const B = bpuParCode(), P = param(), F = filtreActifs(), filtre = Object.keys(F).length > 0;
+  let ht = 0, htF = 0, nF = 0;
+  MOD.lignes.forEach(l => {
+    const m = montant(l, B, P); if (m !== null) ht += m;
+    if (filtre && garde(l, F, B, P)) { nF++; if (m !== null) htF += m; }
+  });
   const r = regDe(MOD.salon) || {};
-  $('modale-sous').textContent = (r.num || 'Devis') + ' · ' + MOD.lignes.length + ' réserve(s) · ' + L.euros(L.arrondi(ht)) + ' HT';
+  $('modale-sous').textContent = (r.num || 'Devis') + ' · ' + MOD.lignes.length + ' réserve(s) · ' + L.euros(L.arrondi(ht)) + ' HT' +
+    (filtre ? ' — filtre : ' + nF + ' réserve(s) · ' + L.euros(L.arrondi(htF)) + ' HT' : '');
 }
 function puDe(l, B, P) {
   const a = B[l.choix]; if (!a) return null;
@@ -463,14 +518,14 @@ function viaObs(l) {
 function ligneHtml(l, i, B, P) {
   const a = B[l.choix], mt = montant(l, B, P);
   const puB = a && L.nombre(a.pu) !== null ? L.nombre(a.pu) * (L.nombre(P.coef) || 1) : null;
-  return '<tr data-i="' + i + '" class="' + (a ? '' : 'ko') + '"><td>' + esc(l.num) + '</td><td>' + esc(l.constat) + '</td><td>' + esc(l.obs) + '</td>' +
+  return '<tr data-i="' + i + '" class="' + (a ? '' : 'ko') + '"><td>' + esc(l.num) + '</td><td>' + esc(l.plan) + '</td><td>' + esc(l.constat) + '</td><td>' + esc(l.obs) + '</td>' +
     '<td><select data-c="choix">' + (l.choix ? '<option value="' + esc(l.choix) + '" selected>' + esc(l.choix) + '</option>' : '<option value="">— ? —</option>') + '</select></td>' +
     '<td>' + (a ? esc(a.des) : '⚠ Non classé') + viaObs(l) + (l.choix !== l.auto && l.choix ? ' <span class="badge orange">code forcé</span>' : '') + '</td>' +
     '<td class="num"><input type="number" min="0" step="1" data-c="qte" value="' + esc(l.qte) + '"></td>' +
     '<td class="num"><input type="number" min="0" step="0.01" data-c="puForce" class="' + (a && puB === null && (l.puForce === null || l.puForce === '') ? 'vide-pu' : '') + '" value="' + (l.puForce === null || l.puForce === undefined ? '' : esc(l.puForce)) + '" placeholder="' + (puB === null ? 'à saisir' : puB.toFixed(2)) + '"></td>' +
     '<td class="num">' + L.euros(mt) + '</td></tr>';
 }
-function dessinerModale() { const B = bpuParCode(), P = param(); $('modale-corps').innerHTML = MOD.lignes.map((l, i) => ligneHtml(l, i, B, P)).join(''); }
+function dessinerModale() { const B = bpuParCode(), P = param(); $('modale-corps').innerHTML = MOD.lignes.map((l, i) => ligneHtml(l, i, B, P)).join(''); appliquerFiltres(); }
 $('modale-corps').addEventListener('focusin', ev => {
   const t = ev.target; if (t.tagName !== 'SELECT' || t.dataset.plein) return;
   const v = t.value; t.innerHTML = optsHtml(); t.value = v; t.dataset.plein = '1';
@@ -483,7 +538,7 @@ $('modale-corps').addEventListener('change', ev => {
   if (c === 'puForce') l.puForce = t.value === '' ? null : Number(t.value);
   const B = bpuParCode(), P = param();
   const n = document.createElement('tbody'); n.innerHTML = ligneHtml(l, Number(tr.dataset.i), B, P);
-  tr.replaceWith(n.firstChild); majSousTitre();
+  tr.replaceWith(n.firstChild); appliquerFiltres();
 });
 $('modale-fermer').addEventListener('click', () => { $('modale').classList.remove('ouverte'); MOD = null; });
 $('modale-sauver').addEventListener('click', async () => {

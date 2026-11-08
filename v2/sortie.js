@@ -108,7 +108,7 @@ export async function pdf(d) {
   };
 
   const th = t => ({ text: t, bold: true, color: '#FFFFFF', fillColor: C.fonce, alignment: 'center', fontSize: 8.5 });
-  const corps = [[th('N°\nréserve'), th('Zone / Plan'), th('Constat'), th('Observations'), th('Code\nBPU'), th('Désignation'),
+  const corps = [[th('N°\nréserve'), th('Hall / zone'), th('Constat'), th('Observations'), th('Code\nBPU'), th('Désignation'),
     th('Unité'), th('Qté'), th('PU HT'), th('Montant HT')]];
   d.lignes.forEach(l => {
     const nc = !l.connu;
@@ -166,12 +166,13 @@ export async function excel(d) {
   const rows = [
     ['Devis N° ' + (d.num || '')], ['Remise en état suite au salon ' + d.salon], [],
     ['Date', d.date || ''], ['Salon', d.salon], ['N° devis', d.num || ''], [],
-    ['N° réserve', 'Zone / Plan', 'Constat', 'Observations', 'Code BPU', 'Désignation', 'Unité', 'Qté', 'PU HT', 'Montant HT']
+    ['N° réserve', 'Hall / zone', 'Constat', 'Observations', 'Code BPU', 'Désignation', 'Unité', 'Qté', 'PU HT', 'Montant HT']
   ];
   d.lignes.forEach(l => rows.push([l.num, l.plan || '', l.constat || '', l.obs || '', l.connu ? l.code : '',
     l.connu ? l.des : '⚠ Non classé', l.unite || '', l.qte, l.pu, l.mt]));
   rows.push([], ['', '', '', '', '', '', '', 'Total HT', '', d.ht], ['', '', '', '', '', '', '', 'TVA', '', d.tva], ['', '', '', '', '', '', '', 'Total TTC', '', d.ttc]);
   const ws = X.utils.aoa_to_sheet(rows);
+  ws['!autofilter'] = { ref: 'A8:J' + (8 + d.lignes.length) }; // filtres sur chaque colonne du tableau
   ws['!cols'] = [10, 18, 26, 32, 9, 44, 8, 6, 11, 12].map(w => ({ wch: w }));
   for (let r = 8; r < rows.length; r++) ['I', 'J'].forEach(c => { const x = ws[c + (r + 1)]; if (x && typeof x.v === 'number') x.z = '#,##0.00 "€"'; });
   const wb = X.utils.book_new();
