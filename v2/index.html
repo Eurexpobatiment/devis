@@ -356,6 +356,7 @@ async function synchroniser() {
       const ac = await FB.jetonAppCheck(); if (ac) h['X-Firebase-AppCheck'] = ac;
       const rep = await fetch(CONFIG.relaisFb, { method: 'POST', headers: h, body: '{}' });
       if (rep.status !== 404) d = await rep.json();
+      if (d && !d.ok) { console.warn('Relais Firebase BatiScript :', d.err); d = null; } // en cas d'échec : ancien relais
     } catch (e) { d = null; }
     // 2) secours : l'ancien relais (script Google), le temps de la transition
     if (!d) {
