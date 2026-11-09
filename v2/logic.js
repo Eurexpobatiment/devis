@@ -37,10 +37,20 @@ export function facturable(r, exclus) {
 
 // Classement : intitulé d'abord, puis observation si l'intitulé ne donne rien ; le plus bas dans la liste l'emporte.
 // L'observation est toujours lue : si elle donne un autre code que l'intitulé, ce code est proposé (sugg) pour vérification.
+// Mot-clé combiné « boitier bas + refixer » : chaque morceau doit se trouver dans l'intitulé OU l'observation ;
+// il compte comme un mot-clé de l'intitulé (même règle de priorité : le plus bas dans la liste l'emporte).
 export function classer(r, mots) {
-  const M = mots.map(m => ({ k: norm(m.mot), c: String(m.code || '').trim() })).filter(m => m.k && m.c);
-  const cherche = t => { let c = ''; if (t) M.forEach(m => { if (t.indexOf(m.k) >= 0) c = m.c; }); return c; };
-  const cInt = cherche(norm(r.int)), cObs = cherche(norm(r.obs));
+  const M = mots.map(m => {
+    const k = norm(m.mot), parts = k.split('+').map(s => s.trim()).filter(Boolean);
+    return { k, parts: parts.length > 1 ? parts : null, c: String(m.code || '').trim() };
+  }).filter(m => m.k && m.c);
+  const tInt = norm(r.int), tObs = norm(r.obs);
+  const dans = (t, k) => !!t && t.indexOf(k) >= 0;
+  let cInt = '', cObs = '';
+  M.forEach(m => {
+    if (m.parts) { if (m.parts.every(p => dans(tInt, p) || dans(tObs, p))) cInt = m.c; }
+    else { if (dans(tInt, m.k)) cInt = m.c; if (dans(tObs, m.k)) cObs = m.c; }
+  });
   const auto = cInt || cObs;
   return {
     auto,
