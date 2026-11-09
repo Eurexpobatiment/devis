@@ -35,22 +35,25 @@ export function facturable(r, exclus) {
   return !!r.ev && ex.indexOf(norm(r.ev)) < 0 && norm(r.etat).indexOf('abandon') !== 0;
 }
 
-// Classement : intitulé d'abord, puis observation si l'intitulé ne donne rien ; le plus bas dans la liste l'emporte
+// Classement : intitulé d'abord, puis observation si l'intitulé ne donne rien ; le plus bas dans la liste l'emporte.
+// L'observation est toujours lue : si elle donne un autre code que l'intitulé, ce code est proposé (sugg) pour vérification.
 export function classer(r, mots) {
   const M = mots.map(m => ({ k: norm(m.mot), c: String(m.code || '').trim() })).filter(m => m.k && m.c);
-  const t = norm(r.int), tObs = norm(r.obs);
-  let auto = '';
-  M.forEach(m => { if (t.indexOf(m.k) >= 0) auto = m.c; });
-  const viaInt = !!auto;
-  if (!auto && tObs) M.forEach(m => { if (tObs.indexOf(m.k) >= 0) auto = m.c; });
-  return { auto, via: auto ? (viaInt ? 'intitulé' : 'observation') : '' };
+  const cherche = t => { let c = ''; if (t) M.forEach(m => { if (t.indexOf(m.k) >= 0) c = m.c; }); return c; };
+  const cInt = cherche(norm(r.int)), cObs = cherche(norm(r.obs));
+  const auto = cInt || cObs;
+  return {
+    auto,
+    via: auto ? (cInt ? 'intitulé' : 'observation') : '',
+    sugg: cInt && cObs && cObs !== cInt ? cObs : ''
+  };
 }
 
 /* Ligne de devis d'une réserve.
  * bpu : { code: {des, unite, pu, lot} } · p : {coef} · o : réglages gardés {force, qte, puForce} */
 export function ligne(r, mots, bpu, p, o) {
   o = o || {};
-  const { auto, via } = classer(r, mots);
+  const { auto, via, sugg } = classer(r, mots);
   const force = String(o.force || '').trim();
   const code = force || auto;
   const a = code ? bpu[code] : null;
@@ -61,7 +64,7 @@ export function ligne(r, mots, bpu, p, o) {
   if (code && a) pu = puForce !== null ? puForce : (puBpu === null ? null : puBpu * (nombre(p.coef) || 1));
   return {
     num: r.num, salon: r.ev, lot: r.lot, constat: r.int, obs: r.obs, plan: r.plan, etat: r.etat, cre: r.cre,
-    auto, via, force, code: a ? code : (code ? code : ''), connu: !!a,
+    auto, via, sugg, force, code: a ? code : (code ? code : ''), connu: !!a,
     des: a ? a.des : '', unite: a ? a.unite : '', qte, puForce, pu,
     mt: pu === null || !a ? null : qte * pu
   };

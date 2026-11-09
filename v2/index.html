@@ -150,7 +150,7 @@
 
   <section id="vue-mots" class="vue">
     <div class="barre">
-      <div><h2>Mots-clés de classement</h2><p class="aide">Un mot-clé trouvé dans l'intitulé d'une réserve lui attribue le code BPU ; si l'intitulé ne donne rien, on cherche dans l'observation (badge « via observation » à vérifier). Majuscules et accents ignorés ; si plusieurs correspondent, le plus bas dans la liste l'emporte (mettez les mots généraux en haut, les plus précis en bas).</p></div>
+      <div><h2>Mots-clés de classement</h2><p class="aide">Un mot-clé trouvé dans l'intitulé d'une réserve lui attribue le code BPU ; si l'intitulé ne donne rien, on cherche dans l'observation (badge « via observation » à vérifier). L'observation est toujours relue : si elle donne un autre code que l'intitulé, celui de l'intitulé est gardé et un badge orange « observation : code » le signale (clic = prendre ce code). Majuscules et accents ignorés ; si plusieurs correspondent, le plus bas dans la liste l'emporte (mettez les mots généraux en haut, les plus précis en bas).</p></div>
       <div class="actions"><input class="recherche" id="filtre-mots" placeholder="Rechercher…"><button class="btn" id="ajout-mot">+ Mot-clé</button><button class="btn plein" id="sauver-mots">Enregistrer</button></div>
     </div>
     <div class="tableau"><table>
@@ -213,7 +213,7 @@ const CONFIG = {
 /* ========================== */
 
 import * as FB from './fb.js?v=3';
-import * as L from './logic.js?v=1';
+import * as L from './logic.js?v=2';
 import * as OUT from './sortie.js?v=5';
 
 const $ = id => document.getElementById(id);
@@ -284,6 +284,8 @@ function dessinerDevis() {
     if (d.sansPu) b += '<span class="badge orange">' + d.sansPu + ' sans prix</span>';
     const obs = d.lignes.filter(l => l.via === 'observation' && !l.force).length;
     if (obs) b += '<span class="badge obs">' + obs + ' via observation</span>';
+    const div = d.lignes.filter(l => l.sugg && !l.force).length;
+    if (div) b += '<span class="badge orange" title="L\'observation donne un autre code BPU que l\'intitulé : à vérifier">' + div + ' à vérifier (observation)</span>';
     if (!d.nc && !d.sansPu) b += '<span class="badge">Complet</span>';
     return '<div class="carte"><h3>' + esc(s) + '</h3>' +
       '<div class="meta">' + esc(r.num || 'N° attribué à la synchronisation') + ' · ' + esc(r.date || auj()) + ' · ' + d.n + ' réserve(s)</div>' +
@@ -519,12 +521,18 @@ function viaObs(l) {
   return l.via === 'observation' && !l.force && l.choix === l.auto
     ? ' <span class="badge obs" title="Code trouvé grâce à l\'observation (intitulé sans mot-clé) : à vérifier">via observation</span>' : '';
 }
+function suggObs(l, B) {
+  if (!l.sugg || l.choix !== l.auto) return '';
+  const a = B[l.sugg];
+  return ' <span class="badge orange lien" data-sugg="' + esc(l.sugg) + '" style="cursor:pointer" title="L\'observation donne ' + esc(l.sugg + (a ? ' – ' + a.des : '')) +
+    ' (code de l\'intitulé gardé). Cliquer pour prendre ce code.">observation : ' + esc(l.sugg) + '</span>';
+}
 function ligneHtml(l, i, B, P) {
   const a = B[l.choix], mt = montant(l, B, P);
   const puB = a && L.nombre(a.pu) !== null ? L.nombre(a.pu) * (L.nombre(P.coef) || 1) : null;
   return '<tr data-i="' + i + '" class="' + (a ? '' : 'ko') + '"><td>' + esc(l.num) + '</td><td>' + esc(l.plan) + '</td><td>' + esc(l.constat) + '</td><td>' + esc(l.obs) + '</td>' +
     '<td><select data-c="choix">' + (l.choix ? '<option value="' + esc(l.choix) + '" selected>' + esc(l.choix) + '</option>' : '<option value="">— ? —</option>') + '</select></td>' +
-    '<td>' + (a ? esc(a.des) : '⚠ Non classé') + viaObs(l) + (l.choix !== l.auto && l.choix ? ' <span class="badge orange">code forcé</span>' : '') + '</td>' +
+    '<td>' + (a ? esc(a.des) : '⚠ Non classé') + viaObs(l) + suggObs(l, B) + (l.choix !== l.auto && l.choix ? ' <span class="badge orange">code forcé</span>' : '') + '</td>' +
     '<td class="num"><input type="number" min="0" step="1" data-c="qte" value="' + esc(l.qte) + '"></td>' +
     '<td class="num"><input type="number" min="0" step="0.01" data-c="puForce" class="' + (a && puB === null && (l.puForce === null || l.puForce === '') ? 'vide-pu' : '') + '" value="' + (l.puForce === null || l.puForce === undefined ? '' : esc(l.puForce)) + '" placeholder="' + (puB === null ? 'à saisir' : puB.toFixed(2)) + '"></td>' +
     '<td class="num">' + L.euros(mt) + '</td></tr>';
@@ -603,6 +611,12 @@ function dessinerModale() {
 $('modale-corps').addEventListener('focusin', ev => {
   const t = ev.target; if (t.tagName !== 'SELECT' || t.dataset.plein) return;
   const v = t.value; t.innerHTML = optsHtml(); t.value = v; t.dataset.plein = '1';
+});
+$('modale-corps').addEventListener('click', ev => {
+  const t = ev.target.closest('[data-sugg]'), tr = t && t.closest('tr'); if (!tr) return;
+  const l = MOD.lignes[Number(tr.dataset.i)]; l.choix = t.dataset.sugg;
+  const n = document.createElement('tbody'); n.innerHTML = ligneHtml(l, Number(tr.dataset.i), bpuParCode(), param());
+  tr.replaceWith(n.firstChild); appliquerFiltres();
 });
 $('modale-corps').addEventListener('change', ev => {
   const t = ev.target, tr = t.closest('tr'); if (!tr) return;
