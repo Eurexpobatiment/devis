@@ -714,7 +714,7 @@ function dessinerMots() {
     if (f && L.norm(m.mot + ' ' + m.code).indexOf(f) < 0) return '';
     return '<tr data-i="' + i + '"><td><input data-c="mot" value="' + esc(m.mot) + '"></td>' +
       '<td><select data-c="code" data-v="' + esc(m.code) + '">' + (m.code ? '<option value="' + esc(m.code) + '" selected>' + esc(m.code + ' – ' + ((S.bpu.find(b => b.code === m.code) || {}).des || '⚠ code absent du BPU')) + '</option>' : '<option value="">— choisir —</option>') + '</select></td>' +
-      '<td><button class="x" data-haut="' + i + '" title="Monter">↑</button><button class="x" data-bas="' + i + '" title="Descendre">↓</button><button class="x" data-del="' + i + '" title="Supprimer">×</button></td></tr>';
+      '<td><button class="x" data-haut="' + i + '" title="Monter">↑</button><button class="x" data-bas="' + i + '" title="Descendre">↓</button><button class="x" data-fond="' + i + '" title="Tout en bas (prioritaire)">⤓</button><button class="x" data-del="' + i + '" title="Supprimer">×</button></td></tr>';
   }).join('');
 }
 $('corps-mots').addEventListener('focusin', ev => {
@@ -728,8 +728,11 @@ $('corps-mots').addEventListener('click', ev => {
   if (t.dataset.del !== undefined) { M().splice(Number(t.dataset.del), 1); dessinerMots(); }
   if (t.dataset.haut !== undefined) { const i = Number(t.dataset.haut); if (i > 0) { const a = M(); [a[i - 1], a[i]] = [a[i], a[i - 1]]; dessinerMots(); } }
   if (t.dataset.bas !== undefined) { const i = Number(t.dataset.bas), a = M(); if (i < a.length - 1) { [a[i + 1], a[i]] = [a[i], a[i + 1]]; dessinerMots(); } }
+  if (t.dataset.fond !== undefined) { const a = M(); a.push(a.splice(Number(t.dataset.fond), 1)[0]); dessinerMots(); toast('Mot-clé placé tout en bas (prioritaire). Pensez à enregistrer.'); }
 });
-$('ajout-mot').addEventListener('click', () => { editMots().unshift({ mot: '', code: '' }); $('filtre-mots').value = ''; dessinerMots(); $('corps-mots').querySelector('input').focus(); });
+// Nouveau mot-clé ajouté en bas : c'est la position prioritaire (le plus bas l'emporte)
+$('ajout-mot').addEventListener('click', () => { editMots().push({ mot: '', code: '' }); $('filtre-mots').value = ''; dessinerMots();
+  const ins = $('corps-mots').querySelectorAll('input[data-c="mot"]'), dern = ins[ins.length - 1]; dern.scrollIntoView({ block: 'center' }); dern.focus(); });
 $('filtre-mots').addEventListener('input', dessinerMots);
 $('sauver-mots').addEventListener('click', async () => {
   if (!MOTS_EDIT) return toast('Aucune modification.');
