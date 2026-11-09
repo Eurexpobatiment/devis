@@ -208,11 +208,13 @@ const CONFIG = {
     appId: '1:408022301135:web:69dee0a5fb479154657aba'
   },
   // Script Google de l'appli devis (relais BatiScript : fonction apiReservesFirebase)
-  relais: 'https://script.google.com/macros/s/AKfycbwvBy70FEari6Hd1InA4Agxcdx2JhDCQejMCgnvkhTHD-EQxnBu3T7D40UuDFxiUV7vOw/exec'
+  relais: 'https://script.google.com/macros/s/AKfycbwvBy70FEari6Hd1InA4Agxcdx2JhDCQejMCgnvkhTHD-EQxnBu3T7D40UuDFxiUV7vOw/exec',
+  // Fonction Firebase « relais-batiscript » (remplace le script Google ; dossier functions/relais-batiscript du dépôt)
+  relaisFb: 'https://europe-west9-equipe-batiment.cloudfunctions.net/relais-batiscript'
 };
 /* ========================== */
 
-import * as FB from './fb.js?v=4';
+import * as FB from './fb.js?v=5';
 import * as L from './logic.js?v=3';
 import * as OUT from './sortie.js?v=5';
 
@@ -347,12 +349,23 @@ async function appliquerImport(entetes, lignes, source) {
 async function synchroniser() {
   const msg = await tache('Lecture des réserves dans BatiScript… (quelques secondes)', async () => {
     const tok = await FB.jeton();
-    let rep;
+    let d = null;
+    // 1) fonction Firebase (compte Bâtiment + App Check vérifiés côté serveur)
     try {
-      rep = await fetch(CONFIG.relais, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify({ fn: 'apiReservesFirebase', args: [tok] }) });
-    } catch (e) { throw new Error('Le script Google ne répond pas (connexion ?). Vous pouvez passer par « Import manuel ».'); }
-    const d = await rep.json().catch(() => { throw new Error('Réponse illisible du script Google.'); });
+      const h = { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok };
+      const ac = await FB.jetonAppCheck(); if (ac) h['X-Firebase-AppCheck'] = ac;
+      const rep = await fetch(CONFIG.relaisFb, { method: 'POST', headers: h, body: '{}' });
+      if (rep.status !== 404) d = await rep.json();
+    } catch (e) { d = null; }
+    // 2) secours : l'ancien relais (script Google), le temps de la transition
+    if (!d) {
+      let rep;
+      try {
+        rep = await fetch(CONFIG.relais, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({ fn: 'apiReservesFirebase', args: [tok] }) });
+      } catch (e) { throw new Error('BatiScript ne répond pas (connexion ?). Vous pouvez passer par « Import manuel ».'); }
+      d = await rep.json().catch(() => { throw new Error('Réponse illisible du script Google.'); });
+    }
     if (!d.ok) throw new Error('BatiScript : ' + d.err);
     return appliquerImport(d.res.entetes, d.res.lignes, 'API BatiScript (synchronisé le ' + d.res.quand + ')');
   });

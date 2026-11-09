@@ -7,7 +7,10 @@ const F = await import(`https://www.gstatic.com/firebasejs/${V}/firebase-firesto
    Sans réseau ou si le module ne se charge pas, l'appli continue normalement. */
 const AC_SITE = '6Le3lBguAAAAAGb774RgCJp5Gd_jfG38Tks9out3';
 const AC = await Promise.race([import(`https://www.gstatic.com/firebasejs/${V}/firebase-app-check.js`), new Promise(r => setTimeout(() => r(null), 4000))]).catch(() => null);
-function appCheck(app) { if (!AC) return; try { AC.initializeAppCheck(app, { provider: new AC.ReCaptchaEnterpriseProvider(AC_SITE), isTokenAutoRefreshEnabled: true }); } catch (e) { console.warn('App Check :', e); } }
+let acInst = null;
+// jeton App Check à joindre aux appels de la fonction Firebase (vide si indisponible)
+export async function jetonAppCheck() { if (!acInst) return ''; try { return (await AC.getToken(acInst, false)).token; } catch (e) { return ''; } }
+function appCheck(app) { if (!AC) return; try { acInst = AC.initializeAppCheck(app, { provider: new AC.ReCaptchaEnterpriseProvider(AC_SITE), isTokenAutoRefreshEnabled: true }); } catch (e) { console.warn('App Check :', e); } }
 
 let app, auth, db;
 let me = '', meEmail = '';

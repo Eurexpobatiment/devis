@@ -1,0 +1,11 @@
+{
+  "name": "relais-batiscript",
+  "version": "1.0.0",
+  "description": "Relais BatiScript de l'appli Devis réserves – Eurexpo (remplace la fonction apiReservesFirebase du script Google)",
+  "main": "index.js",
+  "engines": { "node": "20" },
+  "dependencies": {
+    "@google-cloud/functions-framework": "^3.4.0",
+    "firebase-admin": "^12.6.0"
+  }
+}
