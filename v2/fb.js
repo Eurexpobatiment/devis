@@ -13,6 +13,28 @@ export async function jetonAppCheck() { if (!acInst) return ''; try { return (aw
 function appCheck(app) { if (!AC) return; try { acInst = AC.initializeAppCheck(app, { provider: new AC.ReCaptchaEnterpriseProvider(AC_SITE), isTokenAutoRefreshEnabled: true }); } catch (e) { console.warn('App Check :', e); } }
 
 let app, auth, db;
+/* Écoute en direct qui ne lâche pas : après un refus passager (jeton de connexion expiré pendant que l'onglet
+   était en arrière-plan, réseau…) on renouvelle le jeton et on réécoute, de plus en plus espacé, et tout de suite
+   au retour sur l'onglet. L'erreur n'est signalée qu'au 3e échec d'affilée. */
+function onSnap(ref, ...args) {
+  const opts = (args[0] && typeof args[0] === 'object') ? args.shift() : {};
+  const next = args[0], err = args[1] || (() => {});
+  let un = null, fini = false, n = 0, t = 0;
+  const go = () => {
+    if (fini) return;
+    un = F.onSnapshot(ref, opts, s => { n = 0; next(s); }, e => {
+      un = null; n++;
+      if ((e.code === 'permission-denied' || e.code === 'unauthenticated') && auth && auth.currentUser) auth.currentUser.getIdToken(true).catch(() => {});
+      if (n === 3) err(e);
+      t = setTimeout(go, Math.min(30000, 1000 * 2 ** Math.min(n, 5)));
+    });
+  };
+  const vis = () => { if (!document.hidden && !un && !fini) { clearTimeout(t); go(); } };
+  document.addEventListener('visibilitychange', vis);
+  go();
+  return () => { fini = true; clearTimeout(t); document.removeEventListener('visibilitychange', vis); if (un) un(); };
+}
+
 let me = '', meEmail = '';
 const unsub = [];
 
@@ -68,15 +90,16 @@ export function onAuth(cb) {
         dejaOk = false; cb({ etat: 'sans-acces', email: meEmail });
       }, async e => {
         accUnsub = null;
-        // Erreur passagère (jeton pas encore à jour, réseau…) : jusqu'à 3 nouvelles tentatives
-        if (essai < 3) {
-          essai++;
-          if (e.code === 'permission-denied' || e.code === 'unauthenticated') await u.getIdToken(true).catch(() => {});
-          await new Promise(r => setTimeout(r, 800 * essai));
-          if (auth.currentUser === u) return ecoute();
-          return;
+        // Erreur passagère (jeton expiré pendant que l'onglet était en arrière-plan, réseau…) : on renouvelle les jetons et on réessaie.
+        // Une fois l'accès confirmé, on réessaie sans fin sans sortir l'utilisateur ; avant, on abandonne après 5 essais.
+        essai++;
+        if (e.code === 'permission-denied' || e.code === 'unauthenticated') {
+          await u.getIdToken(true).catch(() => {});
+          if (acInst) await AC.getToken(acInst, true).catch(() => {});
         }
-        dejaOk = false; cb({ etat: 'erreur', email: meEmail, err: errMsg(e) });
+        if (!dejaOk && essai > 5) { cb({ etat: 'erreur', email: meEmail, err: errMsg(e) }); return; }
+        await new Promise(r => setTimeout(r, Math.min(30000, 800 * 2 ** Math.min(essai, 6))));
+        if (auth.currentUser === u && !accUnsub) return ecoute();
       });
     };
     ecoute();
@@ -92,10 +115,10 @@ export const recharger = () => location.reload();
 // onData(nom, valeur) : 'bpu' (liste), 'reserves' (liste), 'registre' (liste), 'config', 'mots', 'meta' (objets)
 export function start(onData, onErr) {
   stop();
-  const liste = (col, nom) => unsub.push(F.onSnapshot(F.collection(db, col),
+  const liste = (col, nom) => unsub.push(onSnap(F.collection(db, col),
     s => onData(nom, s.docs.map(d => Object.assign({}, d.data(), { id: d.id })), s.metadata.fromCache),
     e => onErr(errMsg(e))));
-  const objet = (id, nom) => unsub.push(F.onSnapshot(F.doc(db, 'DevisParam', id),
+  const objet = (id, nom) => unsub.push(onSnap(F.doc(db, 'DevisParam', id),
     s => onData(nom, s.exists() ? s.data() : null, s.metadata.fromCache),
     e => onErr(errMsg(e))));
   liste('DevisBPU', 'bpu');
