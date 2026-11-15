@@ -184,13 +184,13 @@ export async function pdf(d) {
     pageSize: 'A4', pageOrientation: 'landscape', pageMargins: [40, 28, 24, 30],
     info: { title: 'Devis ' + (d.num || '') + ' – ' + d.salon, author: EMETTEUR },
     defaultStyle: { fontSize: 8.5, color: C.texte, lineHeight: 1.1 },
-    background: (page) => page === 1
+    background: (page, taille) => page === 1
       ? { canvas: [
           { type: 'rect', x: 0, y: 0, w: 374, h: H, color: C.clair },
           { type: 'rect', x: 374, y: 0, w: W - 374, h: H, color: C.vert },
           { type: 'rect', x: 233, y: 116, w: 141, h: 195, color: C.fonce }
         ] }
-      : { canvas: [{ type: 'rect', x: 0, y: 0, w: 12, h: W, color: C.vert }] },
+      : { canvas: [{ type: 'rect', x: 0, y: 0, w: 12, h: taille && taille.height ? taille.height : H, color: C.vert }] },
     footer: (page, nb) => page === 1 ? null : {
       columns: [
         { text: 'Devis ' + (d.num || '') + ' – ' + d.salon, fontSize: 7, color: C.gris },
