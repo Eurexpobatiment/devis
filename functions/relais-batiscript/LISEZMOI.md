@@ -4,6 +4,12 @@ Remplace la fonction `apiReservesFirebase` du script Google « Devis réserves s
 Lit les réserves du chantier « EDL eurexpo » dans l'API BatiScript et les renvoie à l'appli Devis (`v2/index.html`, `CONFIG.relaisFb`).
 L'appli repasse par l'ancien script Google si la fonction échoue.
 
+Depuis le 16 nov. 2026, la fonction sert aussi les plans des réserves du devis PDF (`v2/plans.js`), selon le corps de l'appel :
+- `{}` : les réserves (synchronisation) ;
+- `{"positions": true}` : plan et position (X, Y entre 0 et 1, origine en haut à gauche) de chaque réserve ;
+- `{"plan": "<IdPlan>"}` : le fichier PDF du plan ;
+- `{"diag": true}` : forme des données BatiScript (noms des champs, textes masqués), pour diagnostic.
+
 - Région : europe-west9 (Paris) · URL : https://europe-west9-equipe-batiment.cloudfunctions.net/relais-batiscript
 - Accès : compte Bâtiment connecté (jeton Firebase + fiche `Acces` active) ; jeton App Check vérifié s'il est présent
   (le rendre obligatoire : variable `REQUIRE_APP_CHECK=1`).
