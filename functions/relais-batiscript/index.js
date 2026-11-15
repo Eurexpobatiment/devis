@@ -96,6 +96,51 @@ async function reserves() {
   return { entetes: ENTETES, lignes, quand: frDateHeure(new Date()) };
 }
 
+/* Diagnostic (corps { "diag": true }) : décrit la FORME des données BatiScript d'un plan et d'une réserve placée sur plan
+ * (noms des champs et types ; nombres visibles, textes masqués) pour savoir si l'API fournit l'image du plan et la
+ * position des réserves. Ne renvoie aucun contenu de réserve. */
+function forme(v, prof) {
+  prof = prof || 0;
+  if (v === null || v === undefined) return 'vide';
+  if (Array.isArray(v)) return v.length ? { 'liste': v.length, 'premier': prof > 3 ? '…' : forme(v[0], prof + 1) } : 'liste vide';
+  if (typeof v === 'object') {
+    if (prof > 3) return 'objet';
+    const o = {}; Object.keys(v).slice(0, 80).forEach(k => { o[k] = forme(v[k], prof + 1); }); return o;
+  }
+  if (typeof v === 'number' || typeof v === 'boolean') return v;
+  const s = String(v);
+  if (/^https?:\/\//i.test(s)) { try { const u = new URL(s); return 'lien (' + u.hostname + ', ' + (/\.[a-z0-9]{2,5}$/i.exec(u.pathname) || ['sans extension'])[0] + ')'; } catch (e) { return 'lien'; } }
+  if (/^-?\d+([.,]\d+)?$/.test(s)) return 'nombre en texte : ' + s;
+  if (/^\d{4}-\d\d-\d\d/.test(s)) return 'date';
+  if (/\.(pdf|png|jpe?g|webp|svg|dwg)$/i.test(s)) return 'nom de fichier (' + /\.[a-z0-9]+$/i.exec(s)[0] + ')';
+  return 'texte (' + s.length + ' car.)';
+}
+async function bsEssai(chemin) {
+  try {
+    let url = BASE + chemin; const db = await bsTargetDb();
+    if (db) url += (url.includes('?') ? '&' : '?') + 'target-db=' + encodeURIComponent(db);
+    const r = await fetch(url, { headers: { Authorization: 'Bearer ' + await bsToken() } });
+    const type = r.headers.get('content-type') || '';
+    const out = { code: r.status, type };
+    if (r.status === 200 && /json/i.test(type)) out.forme = forme(await r.json());
+    else if (r.status === 200) out.taille = (await r.arrayBuffer()).byteLength;
+    return out;
+  } catch (e) { return { erreur: e.message || String(e) }; }
+}
+async function diagnostic() {
+  const id = await bsChantierId();
+  const [res, plans] = await Promise.all([bsGet('/public/chantiers/' + id + '/reserves'), bsGet('/public/chantiers/' + id + '/plans')]);
+  const lr = Object.keys(res).map(k => res[k]), cles = Object.keys(plans);
+  const r = lr.filter(x => x.IdPlan && plans[x.IdPlan]).pop() || lr[lr.length - 1] || null;
+  const idPlan = r && r.IdPlan && plans[r.IdPlan] ? r.IdPlan : cles[0];
+  const champsReserve = {}; lr.forEach(x => Object.keys(x).forEach(k => { champsReserve[k] = (champsReserve[k] || 0) + (x[k] === null || x[k] === '' ? 0 : 1); }));
+  const essais = {};
+  if (idPlan !== undefined) for (const c of ['/public/chantiers/' + id + '/plans/' + idPlan, '/public/plans/' + idPlan])
+    essais[c.replace(String(id), '{chantier}').replace(String(idPlan), '{plan}')] = await bsEssai(c);
+  return { quand: frDateHeure(new Date()), nbReserves: lr.length, nbPlans: cles.length, reservesAvecPlan: lr.filter(x => x.IdPlan && plans[x.IdPlan]).length,
+    plan: idPlan !== undefined ? forme(plans[idPlan]) : null, reserve: r ? forme(r) : null, champsReserveRemplis: champsReserve, essais };
+}
+
 // Compte Bâtiment : même contrôle que les règles Firestore (propriétaire, ou fiche Acces active)
 async function verifierCompte(req) {
   const m = /^Bearer\s+(.+)$/i.exec(req.get('Authorization') || '');
@@ -126,6 +171,12 @@ functions.http('relais', async (req, res) => {
   try {
     await verifierAppCheck(req);
     const email = await verifierCompte(req);
+    let corps = req.body; if (typeof corps === 'string') { try { corps = JSON.parse(corps); } catch (e) { corps = {}; } }
+    if (corps && corps.diag) {
+      const d = await diagnostic();
+      console.log('Diagnostic BatiScript (plans) envoyé à ' + email);
+      return res.json({ ok: true, diag: d });
+    }
     const out = await reserves();
     console.log('Réserves BatiScript envoyées à ' + email + ' : ' + out.lignes.length);
     res.json({ ok: true, res: out });
