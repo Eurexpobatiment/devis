@@ -141,6 +141,37 @@ async function diagnostic() {
     plan: idPlan !== undefined ? forme(plans[idPlan]) : null, reserve: r ? forme(r) : null, champsReserveRemplis: champsReserve, essais };
 }
 
+/* Plans des réserves (devis PDF)
+ *  - corps { "positions": true } : pour chaque réserve placée sur un plan, [IdPlan, X, Y] (X, Y entre 0 et 1), et le nom des plans ;
+ *  - corps { "plan": "<IdPlan>" } : le fichier du plan (PDF ou image), tel que BatiScript le fournit. */
+let plansCache = null, plansFin = 0;
+async function bsPlans() {
+  if (plansCache && Date.now() < plansFin) return plansCache;
+  plansCache = await bsGet('/public/chantiers/' + await bsChantierId() + '/plans'); plansFin = Date.now() + 300000;
+  return plansCache;
+}
+async function positions() {
+  const id = await bsChantierId();
+  const [res, plans] = await Promise.all([bsGet('/public/chantiers/' + id + '/reserves'), bsPlans()]);
+  const pos = {}, noms = {};
+  Object.keys(res).forEach(k => {
+    const r = res[k], x = Number(r.PositionX), y = Number(r.PositionY);
+    if (!r.IdPlan || !plans[r.IdPlan] || r.IsOutOfPlan || !isFinite(x) || !isFinite(y)) return;
+    pos[String(r.Numero)] = [r.IdPlan, Math.round(x * 1e5) / 1e5, Math.round(y * 1e5) / 1e5];
+    noms[r.IdPlan] = plans[r.IdPlan].NomComplet || plans[r.IdPlan].Nom || '';
+  });
+  return { pos, plans: noms, quand: frDateHeure(new Date()) };
+}
+async function fichierPlan(idPlan) {
+  const plans = await bsPlans();
+  if (!Object.prototype.hasOwnProperty.call(plans, idPlan)) throw Object.assign(new Error('Plan inconnu'), { code: 404 });
+  let url = BASE + '/public/chantiers/' + await bsChantierId() + '/plans/' + encodeURIComponent(idPlan);
+  const db = await bsTargetDb(); if (db) url += '?target-db=' + encodeURIComponent(db);
+  const r = await fetch(url, { headers: { Authorization: 'Bearer ' + await bsToken() } });
+  if (r.status !== 200) throw new Error('BatiScript (plan) : erreur ' + r.status);
+  return { type: r.headers.get('content-type') || 'application/octet-stream', data: Buffer.from(await r.arrayBuffer()) };
+}
+
 // Compte Bâtiment : même contrôle que les règles Firestore (propriétaire, ou fiche Acces active)
 async function verifierCompte(req) {
   const m = /^Bearer\s+(.+)$/i.exec(req.get('Authorization') || '');
@@ -176,6 +207,17 @@ functions.http('relais', async (req, res) => {
       const d = await diagnostic();
       console.log('Diagnostic BatiScript (plans) envoyé à ' + email);
       return res.json({ ok: true, diag: d });
+    }
+    if (corps && corps.positions) {
+      const p = await positions();
+      console.log('Positions des réserves envoyées à ' + email + ' : ' + Object.keys(p.pos).length);
+      return res.json({ ok: true, res: p });
+    }
+    if (corps && corps.plan) {
+      const f = await fichierPlan(String(corps.plan));
+      console.log('Plan ' + corps.plan + ' envoyé à ' + email + ' (' + f.data.length + ' octets)');
+      res.set('Content-Type', f.type); res.set('Cache-Control', 'private, max-age=600');
+      return res.send(f.data);
     }
     const out = await reserves();
     console.log('Réserves BatiScript envoyées à ' + email + ' : ' + out.lignes.length);

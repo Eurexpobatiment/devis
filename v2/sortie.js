@@ -164,6 +164,22 @@ export async function pdf(d) {
   });
   const total = (lib, v, gras) => [{ text: lib, colSpan: 2, bold: gras, alignment: 'right' }, '', { text: euros(v), bold: gras, alignment: 'right' }];
 
+  // Plans des réserves (d.plans : [{ nom, img, w, h, nums }]) : une page par plan, rangés par hall, à la suite du devis
+  const pagesPlans = [];
+  (d.plans || []).slice().sort((a, b) => {
+    const x = cleHall(a.nom), y = cleHall(b.nom);
+    for (let i = 0; i < 4; i++) if (x[i] !== y[i]) return x[i] - y[i];
+    return cmpTxt(a.nom, b.nom);
+  }).forEach(P => {
+    const portrait = P.h > P.w * 1.15;
+    pagesPlans.push({ pageBreak: 'before', pageOrientation: portrait ? 'portrait' : 'landscape', columns: [
+      { width: '*', text: [{ text: 'Plan des réserves', bold: true, fontSize: 13, color: C.fonce }, { text: '   ' + P.nom, fontSize: 11, color: C.texte }] },
+      { width: 'auto', text: P.nums.length + ' réserve' + (P.nums.length > 1 ? 's' : '') + ' · Devis ' + (d.num || '') + ' – ' + d.salon, fontSize: 8, color: C.gris, margin: [0, 5, 0, 0] }
+    ] });
+    pagesPlans.push({ canvas: [{ type: 'line', x1: 0, y1: 0, x2: 205, y2: 0, lineWidth: 1.5, lineColor: C.accent }], margin: [0, 3, 0, 8] });
+    pagesPlans.push({ image: P.img, fit: portrait ? [H - 64, W - 58 - 40] : [W - 64, H - 58 - 40], alignment: 'center' });
+  });
+
   const doc = {
     pageSize: 'A4', pageOrientation: 'landscape', pageMargins: [40, 28, 24, 30],
     info: { title: 'Devis ' + (d.num || '') + ' – ' + d.salon, author: EMETTEUR },
@@ -174,7 +190,7 @@ export async function pdf(d) {
           { type: 'rect', x: 374, y: 0, w: W - 374, h: H, color: C.vert },
           { type: 'rect', x: 233, y: 116, w: 141, h: 195, color: C.fonce }
         ] }
-      : { canvas: [{ type: 'rect', x: 0, y: 0, w: 12, h: H, color: C.vert }] },
+      : { canvas: [{ type: 'rect', x: 0, y: 0, w: 12, h: W, color: C.vert }] },
     footer: (page, nb) => page === 1 ? null : {
       columns: [
         { text: 'Devis ' + (d.num || '') + ' – ' + d.salon, fontSize: 7, color: C.gris },
@@ -195,7 +211,7 @@ export async function pdf(d) {
       ] }, layout: 'noBorders', fontSize: 9.5 }], margin: [0, 10, 0, 0], unbreakable: true },
       { text: 'Prix unitaires HT issus du bordereau de prix (BPU) remise en état après salon.', fontSize: 7.5, italics: true, margin: [0, 14, 0, 0] },
       { text: 'Réserves relevées dans BatiScript' + (d.source ? ' – ' + d.source : '') + '.', fontSize: 7.5, italics: true }
-    ])
+    ], pagesPlans)
   };
   const blob = await new Promise((ok, ko) => { try { pm.createPdf(doc).getBlob(ok); } catch (e) { ko(e); } });
   return blob;

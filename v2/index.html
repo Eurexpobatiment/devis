@@ -216,7 +216,8 @@ const CONFIG = {
 
 import * as FB from './fb.js?v=6';
 import * as L from './logic.js?v=3';
-import * as OUT from './sortie.js?v=5';
+import * as OUT from './sortie.js?v=6';
+import * as PLANS from './plans.js?v=1';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -428,10 +429,35 @@ async function sortir(d, type) {
   try {
     const r = await OUT.enregistrer(OUT.nomFichier(d, type === 'pdf' ? 'pdf' : 'xlsx'),
       type === 'pdf' ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      () => type === 'pdf' ? OUT.pdf(d) : OUT.excel(d),
+      () => type === 'pdf' ? avecPlans(d).then(OUT.pdf) : OUT.excel(d),
       () => attendre(type === 'pdf' ? 'Fabrication du PDF…' : 'Fabrication du fichier Excel…'));
-    if (r === 'enregistre') toast('Fichier enregistré.');
-  } catch (e) { toast(e && e.message ? e.message : String(e), true); } finally { fini(); }
+    if (r === 'annule') return;
+    if (type === 'pdf' && d._plansMsg) toast((r === 'enregistre' ? 'Fichier enregistré. ' : '') + d._plansMsg, true);
+    else if (r === 'enregistre') toast('Fichier enregistré.');
+  } catch (e) { toast(e && e.message ? e.message : String(e), true); } finally { fini(); delete d.plans; delete d._plansMsg; }
+}
+// Appel de la fonction relais BatiScript (compte Bâtiment + App Check), corps JSON
+async function appelRelais(corps) {
+  const h = { 'Content-Type': 'application/json', Authorization: 'Bearer ' + await FB.jeton() };
+  const ac = await FB.jetonAppCheck(); if (ac) h['X-Firebase-AppCheck'] = ac;
+  return fetch(CONFIG.relaisFb, { method: 'POST', headers: h, body: JSON.stringify(corps) });
+}
+// Ajoute au devis les plans des réserves (pastilles numérotées). En cas de souci, le PDF sort quand même, sans plan.
+async function avecPlans(d) {
+  d._plansMsg = '';
+  try {
+    const P = await PLANS.pages(d.lignes.map(l => l.num), appelRelais, attendre);
+    d.plans = P.pages;
+    const m = [];
+    if (P.erreurs.length) m.push('plan(s) non récupéré(s) : ' + P.erreurs.join(', '));
+    if (P.absentes.length) m.push(P.absentes.length + ' réserve(s) sans position dans BatiScript (n° ' + P.absentes.slice(0, 8).join(', ') + (P.absentes.length > 8 ? '…' : '') + ')');
+    if (m.length) d._plansMsg = 'Plans : ' + m.join(' ; ') + '.';
+  } catch (e) {
+    console.warn('Plans des réserves :', e);
+    d.plans = []; d._plansMsg = 'PDF fabriqué sans les plans des réserves (' + (e && e.message ? e.message : e) + ').';
+  }
+  attendre('Fabrication du PDF…');
+  return d;
 }
 const compact = d => ({ n: d.n, nc: d.nc, sansPu: d.sansPu, ht: d.ht, tva: d.tva, ttc: d.ttc, taux: d.taux,
   lignes: d.lignes.map(l => ({ num: l.num, plan: l.plan, constat: l.constat, obs: l.obs, code: l.code, connu: l.connu, des: l.des, unite: l.unite, qte: l.qte, pu: l.pu, mt: l.mt })) });
