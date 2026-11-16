@@ -112,7 +112,7 @@ export function stop() { while (unsub.length) { try { unsub.pop()(); } catch (e)
 // Relancer la vérification d'accès (bouton « Réessayer »)
 export const recharger = () => location.reload();
 
-// onData(nom, valeur) : 'bpu' (liste), 'reserves' (liste), 'registre' (liste), 'config', 'mots', 'meta' (objets)
+// onData(nom, valeur) : 'bpu' (liste), 'reserves' (liste), 'registre' (liste), 'config', 'mots', 'meta', 'modeles' (objets)
 export function start(onData, onErr) {
   stop();
   const liste = (col, nom) => unsub.push(onSnap(F.collection(db, col),
@@ -127,6 +127,7 @@ export function start(onData, onErr) {
   objet('config', 'config');
   objet('mots', 'mots');
   objet('meta', 'meta');
+  objet('modeles', 'modeles');   // modèles de rapport (onglet Édition de rapport)
 }
 
 const stamp = () => ({ majPar: me, majLe: new Date().toISOString() });

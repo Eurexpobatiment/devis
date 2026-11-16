@@ -96,6 +96,13 @@
   .multi label { display: flex; gap: 7px; align-items: flex-start; font-size: 13px; padding: 4px 4px; border-radius: 5px; cursor: pointer; }
   .multi label:hover { background: var(--fond); }
   .multi label span { flex: 1; overflow-wrap: anywhere; } .multi label i { font-style: normal; color: var(--gris); font-size: 12px; }
+  #r-modeles .liste { min-width: 300px; max-width: min(360px, 90vw); }
+  #r-modeles .mod { display: flex; gap: 6px; align-items: center; padding: 5px 4px; border-radius: 5px; font-size: 13px; cursor: pointer; }
+  #r-modeles .mod:hover { background: var(--fond); } #r-modeles .mod span { flex: 1; overflow-wrap: anywhere; } #r-modeles .mod i { font-style: normal; color: var(--gris); font-size: 11.5px; white-space: nowrap; }
+  #r-modeles .mod button { border: 0; background: none; color: var(--alerte); cursor: pointer; font-size: 15px; padding: 0 4px; }
+  #r-modeles .nouveau { border-top: 1px solid var(--ligne); margin-top: 6px; padding-top: 8px; display: flex; flex-direction: column; gap: 6px; }
+  #r-modeles .nouveau div { display: flex; gap: 6px; } #r-modeles .nouveau input[type=text] { flex: 1; min-width: 0; font: 13px Lato, Arial, sans-serif; border: 1px solid var(--ligne); border-radius: 6px; padding: 6px 8px; }
+  #r-modeles .nouveau label { padding: 0; font-size: 12px; color: var(--gris); } #r-modeles .nouveau .btn { padding: 6px 12px; font-size: 12.5px; }
   tr.groupe td { background: #E6F6F2; color: var(--vert-fonce); font-weight: 700; }
   #r-tete th, #r-corps td.fixe { white-space: nowrap; }
   #vue-rapport .tableau { max-height: calc(100vh - 150px); } #vue-rapport td { overflow-wrap: break-word; } #r-corps td.nc { color: var(--alerte); font-weight: 700; }
@@ -154,8 +161,8 @@
 
   <section id="vue-rapport" class="vue">
     <div class="barre">
-      <div><h2>Édition de rapport</h2><p class="aide">Toutes les réserves de la dernière synchronisation BatiScript : tous les événements, y compris ceux exclus des devis (régie, maintenance…) et les réserves abandonnées. Choisissez les filtres, le regroupement et les colonnes, puis éditez le rapport. Un filtre sans rien de coché prend tout. Avec les photos ou les plans, le PDF fait une partie par groupe (par hall, par défaut) : les réserves, puis leurs photos, puis leurs plans.</p></div>
-      <div class="actions"><button class="btn" id="r-raz">Effacer les filtres</button><button class="btn plein" id="r-pdf">PDF</button><button class="btn" id="r-xls">Excel</button></div>
+      <div><h2>Édition de rapport</h2><p class="aide">Toutes les réserves de la dernière synchronisation BatiScript : tous les événements, y compris ceux exclus des devis (régie, maintenance…) et les réserves abandonnées. Choisissez les filtres, le regroupement et les colonnes, puis éditez le rapport. « Modèles » enregistre ces réglages pour toute l'équipe et les réapplique d'un clic. Un filtre sans rien de coché prend tout. Avec les photos ou les plans, le PDF fait une partie par groupe (par hall, par défaut) : les réserves, puis leurs photos, puis leurs plans.</p></div>
+      <div class="actions"><details class="multi" id="r-modeles"><summary>Modèles <b></b></summary><div class="liste"><div id="r-mod-liste"></div><div class="nouveau"><div><input type="text" id="r-mod-nom" maxlength="60" placeholder="Nom du modèle"><button class="btn plein" id="r-mod-ok">Enregistrer</button></div><label title="À cocher pour un modèle propre à un salon. Sinon le modèle se réutilise d'un salon à l'autre : vous choisissez l'événement après l'avoir appliqué."><input type="checkbox" id="r-mod-ev"><span>Garder aussi l'événement, les dates et la recherche</span></label></div></div></details><button class="btn" id="r-raz">Effacer les filtres</button><button class="btn plein" id="r-pdf">PDF</button><button class="btn" id="r-xls">Excel</button></div>
     </div>
     <div class="filtres" id="r-filtres"></div>
     <div class="filtres">
@@ -259,7 +266,7 @@ const CONFIG = {
 };
 /* ========================== */
 
-import * as FB from './fb.js?v=6';
+import * as FB from './fb.js?v=7';
 import * as L from './logic.js?v=4';
 import * as OUT from './sortie.js?v=8';
 import * as PLANS from './plans.js?v=1';
@@ -284,7 +291,7 @@ async function tache(msg, f) {
 }
 
 /* ---------- État ---------- */
-const S = { bpu: [], reserves: [], registre: [], config: null, mots: null, meta: null, charge: {} };
+const S = { bpu: [], reserves: [], registre: [], config: null, mots: null, meta: null, modeles: null, charge: {} };
 let CALC = {};
 const param = () => ({ tva: S.config ? S.config.tva : 0.2, coef: S.config ? S.config.coef : 1, exclus: S.config ? S.config.exclus || [] : [] });
 const motsListe = () => (S.mots && S.mots.liste) || [];
@@ -835,6 +842,65 @@ $('r-raz').addEventListener('click', () => {
 // une liste ouverte se referme quand on clique ailleurs
 document.addEventListener('click', ev => { document.querySelectorAll('details.multi[open]').forEach(d => { if (!d.contains(ev.target)) d.open = false; }); });
 
+/* Modèles de rapport : réglages enregistrés dans Firebase (DevisParam/modeles), communs à toute l'équipe */
+const modeles = () => Object.entries((S.modeles && S.modeles.liste) || {}).map(([id, m]) => Object.assign({ id }, m)).filter(m => m && m.nom).sort((a, b) => a.nom.localeCompare(b.nom, 'fr'));
+const idModele = nom => 'm_' + (L.norm(nom).replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'modele');
+function dessinerModeles() {
+  const M = modeles();
+  $('r-modeles').querySelector('summary b').textContent = M.length || '';
+  $('r-mod-liste').innerHTML = M.length
+    ? M.map(m => '<div class="mod" data-id="' + esc(m.id) + '" title="Appliquer ce modèle"><span>' + esc(m.nom) + '</span><i>' + esc(m.majPar || '') + '</i><button data-suppr title="Supprimer ce modèle">×</button></div>').join('')
+    : '<p class="aide" style="margin:4px">Aucun modèle pour l\'instant : réglez le rapport, donnez un nom ci-dessous puis « Enregistrer ».</p>';
+}
+function reglagesRapport(avecEv) {
+  const sel = {};
+  RAP.DIMS.forEach(d => { if ((avecEv || d.k !== 'ev') && RP.sel[d.k].size) sel[d.k] = [...RP.sel[d.k]]; });
+  return { sel, groupe: RP.groupe, cols: [...RP.cols], titre: $('r-titre').value.trim(), sous: $('r-sous').value.trim(),
+    garde: $('r-garde').checked, plans: $('r-plans').checked, photos: $('r-photos').checked, avecEv: !!avecEv,
+    du: avecEv ? $('r-du').value : '', au: avecEv ? $('r-au').value : '', txt: avecEv ? $('r-txt').value : '' };
+}
+function appliquerModele(m) {
+  // modèle sans événement : l'événement, les dates et la recherche en cours sont conservés
+  RAP.DIMS.forEach(d => { if (m.avecEv || d.k !== 'ev') RP.sel[d.k] = new Set((m.sel && m.sel[d.k]) || []); });
+  if (m.avecEv) { $('r-du').value = m.du || ''; $('r-au').value = m.au || ''; $('r-txt').value = m.txt || ''; }
+  if (RAP.GROUPES.some(x => x[0] === m.groupe)) { RP.groupe = m.groupe; $('r-groupe').value = m.groupe; }
+  const cols = (m.cols || []).filter(k => RAP.COLS.some(c => c.k === k));
+  if (cols.length) { RP.cols = new Set(cols); $('r-cols').querySelectorAll('input').forEach(c => { c.checked = RP.cols.has(c.value); }); }
+  $('r-titre').value = m.titre || ''; $('r-sous').value = m.sous || '';
+  $('r-garde').checked = m.garde !== false; $('r-plans').checked = !!m.plans; $('r-photos').checked = !!m.photos;
+  garderRapport(); dessinerRapport();
+  // filtres du modèle absents de la synchronisation en cours (dessinerRapport les a retirés)
+  const perdus = RAP.DIMS.filter(d => (m.avecEv || d.k !== 'ev') && m.sel && (m.sel[d.k] || []).some(v => !RP.sel[d.k].has(v))).map(d => d.lib.toLowerCase());
+  $('r-modeles').open = false;
+  toast('Modèle « ' + m.nom + ' » appliqué.' + (perdus.length ? ' Valeurs absentes des réserves actuelles, ignorées : ' + perdus.join(', ') + '.' : ''), perdus.length > 0);
+}
+$('r-mod-liste').addEventListener('click', async ev => {
+  const li = ev.target.closest('.mod'); if (!li) return;
+  const m = modeles().find(x => x.id === li.dataset.id); if (!m) return;
+  if (ev.target.dataset.suppr === undefined) return appliquerModele(m);
+  ev.stopPropagation();
+  if (!confirm('Supprimer le modèle « ' + m.nom + ' » ?\nIl disparaît pour toute l\'équipe.')) return;
+  try { await FB.majParam('modeles', { liste: { [m.id]: FB.effacerChamp() } }); toast('Modèle supprimé.'); }
+  catch (e) { toast(e && e.message ? e.message : String(e), true); }
+});
+async function enregistrerModele() {
+  const nom = $('r-mod-nom').value.trim();
+  if (!nom) { $('r-mod-nom').focus(); return toast('Donnez un nom au modèle.', true); }
+  if (!RP.cols.size) return toast('Cochez au moins une colonne.', true);
+  const id = idModele(nom), deja = modeles().find(m => m.id === id);
+  if (deja && !confirm('Le modèle « ' + deja.nom + ' » existe déjà.\nLe remplacer par les réglages actuels ?')) return;
+  try {
+    // l'ancien modèle du même nom est effacé puis réécrit en entier (sinon ses anciens filtres resteraient fusionnés)
+    if (deja) await FB.majParam('modeles', { liste: { [id]: FB.effacerChamp() } });
+    await FB.majParam('modeles', { liste: { [id]: Object.assign({ nom, majPar: FB.whoami().nom, majLe: new Date().toISOString() }, reglagesRapport($('r-mod-ev').checked)) } });
+    $('r-mod-nom').value = ''; $('r-modeles').open = false;
+    toast('Modèle « ' + nom + ' » enregistré.');
+  } catch (e) { toast(e && e.message ? e.message : String(e), true); }
+}
+$('r-mod-ok').addEventListener('click', enregistrerModele);
+$('r-mod-nom').addEventListener('keydown', ev => { if (ev.key === 'Enter') { ev.preventDefault(); enregistrerModele(); } });
+dessinerModeles();
+
 async function sortirRapport(type) {
   const F = filtreRapport(), rows = RAP.filtrer(RP.lignes, F);
   if (!rows.length) return toast('Aucune réserve ne correspond à ces filtres.', true);
@@ -1038,6 +1104,7 @@ FB.onAuth(a => {
   FB.start((nom, val) => {
     S[nom] = val; S.charge[nom] = true;
     if (nom === 'bpu') OPTS = null;
+    if (nom === 'modeles') dessinerModeles();
     dessiner();
   }, msg => toast(msg, true));
 });
