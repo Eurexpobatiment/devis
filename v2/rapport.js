@@ -156,7 +156,7 @@ const bilan = R => R.n + ' réserve' + (R.n > 1 ? 's' : '') + (R.avecMt ? ' · '
  * Un plan est rangé dans la partie de ses réserves ; s'il porte des réserves de plusieurs groupes, il va à la fin. */
 export async function pdf(R) {
   const pm = await OUT.pdfmake();
-  const [logo, photo] = await Promise.all([OUT.image('logo.png'), R.garde ? OUT.image('garde.jpg') : null]);
+  const [logo, photo] = await Promise.all([OUT.image('logo.png'), R.garde ? OUT.image('garde-rapport.jpg') : null]);
   const W = 841.89, H = 595.28;
   const edite = new Date().toLocaleDateString('fr-FR');
   const nb = R.cols.length;
