@@ -128,7 +128,7 @@ export function rapport(lignesFiltrees, F, o) {
   const cols = COLS.filter(c => o.cols.indexOf(c.k) >= 0);
   let ht = 0; lignesFiltrees.forEach(l => { if (l.mt !== null && l.mt !== undefined) ht += l.mt; });
   return { titre: String(o.titre || '').trim() || 'Rapport des réserves', filtres: resume(F), groupes: G, cols, n: lignesFiltrees.length, ht: L.arrondi(ht),
-    groupeLib: o.groupe ? (GROUPES.find(g => g[0] === o.groupe) || [])[1] : '', avecMt: cols.some(c => c.k === 'mt'), source: o.source || '', plans: [] };
+    groupeLib: o.groupe ? (GROUPES.find(g => g[0] === o.groupe) || [])[1] : '', avecMt: cols.some(c => c.k === 'mt'), source: o.source || '', plans: [], photos: [] };
 }
 
 export const nomFichier = (R, ext) => {
@@ -220,6 +220,27 @@ export async function pdf(R) {
       paddingTop: () => 3.5, paddingBottom: () => 3.5, paddingLeft: () => 3, paddingRight: () => 3 } });
   if (R.avecMt) contenu.push({ text: 'Montants HT estimés avec le bordereau de prix (BPU) remise en état après salon ; les réserves non classées ou sans prix ne sont pas chiffrées.', fontSize: 7.5, italics: true, margin: [0, 12, 0, 0] });
   contenu.push({ text: 'Réserves relevées dans BatiScript' + (R.source ? ' – ' + R.source : '') + '. Édité le ' + edite + '.', fontSize: 7.5, italics: true, margin: [0, R.avecMt ? 0 : 12, 0, 0] });
+
+  // Photos des réserves (R.photos : [{ num, i, n, img, w, h }], dans l'ordre du rapport) : 4 par rangée, à la suite du tableau
+  if (R.photos && R.photos.length) {
+    const parNum = {}; R.groupes.forEach(G => G.lignes.forEach(l => { parNum[String(l.num)] = l; }));
+    const PAR = 4, cases = R.photos.map(p => {
+      const l = parNum[p.num] || {};
+      return { stack: [
+        { image: p.img, fit: [180, 132], alignment: 'center' },
+        { text: [{ text: 'N° ' + p.num + (p.n > 1 ? ' (' + (p.i + 1) + '/' + p.n + ')' : ''), bold: true, color: C.fonce }, { text: l.plan ? '  ·  ' + l.plan : '' }], fontSize: 7.5, margin: [0, 3, 0, 0] },
+        { text: l.constat || '', fontSize: 7, color: C.gris }
+      ], margin: [0, 0, 0, 6] };
+    });
+    const rangs = [];
+    for (let i = 0; i < cases.length; i += PAR) { const r = cases.slice(i, i + PAR); while (r.length < PAR) r.push(''); rangs.push(r); }
+    contenu.push({ pageBreak: 'before', columns: [
+      { width: '*', text: 'Photos des réserves', bold: true, fontSize: 13, color: C.fonce },
+      { width: 'auto', text: R.photos.length + ' photo' + (R.photos.length > 1 ? 's' : '') + ' · ' + R.titre, fontSize: 8, color: C.gris, margin: [0, 5, 0, 0] }
+    ] });
+    contenu.push({ canvas: [{ type: 'line', x1: 0, y1: 0, x2: 205, y2: 0, lineWidth: 1.5, lineColor: C.accent }], margin: [0, 3, 0, 8] });
+    contenu.push({ table: { dontBreakRows: true, widths: ['*', '*', '*', '*'], body: rangs }, layout: 'noBorders' });
+  }
 
   // Plans des réserves (R.plans : [{ nom, img, w, h, nums }]) : une page par plan, rangés par hall
   (R.plans || []).slice().sort((a, b) => OUT.cmpHall(a.nom, b.nom)).forEach(P => {

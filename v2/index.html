@@ -166,6 +166,7 @@
       <div class="lib">Colonnes<details class="multi" id="r-cols"><summary>Choisir <b></b></summary><div class="liste"></div></details></div>
       <label class="lib" style="flex:1;min-width:220px">Titre du rapport<input type="text" id="r-titre" placeholder="Rapport des réserves"></label>
       <label class="coche" title="Ajoute au PDF une page par plan, avec une pastille numérotée par réserve du rapport"><input type="checkbox" id="r-plans"> Plans dans le PDF</label>
+      <label class="coche" title="Ajoute au PDF les photos BatiScript des réserves du rapport, à la suite du tableau (4 par rangée)"><input type="checkbox" id="r-photos"> Photos dans le PDF</label>
     </div>
     <div class="kpis" id="r-kpis"></div>
     <div id="r-synthese"></div>
@@ -260,7 +261,8 @@ import * as FB from './fb.js?v=6';
 import * as L from './logic.js?v=3';
 import * as OUT from './sortie.js?v=7';
 import * as PLANS from './plans.js?v=1';
-import * as RAP from './rapport.js?v=1';
+import * as RAP from './rapport.js?v=2';
+import * as PHOTOS from './photos.js?v=1';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -834,16 +836,26 @@ async function sortirRapport(type) {
   if (!rows.length) return toast('Aucune réserve ne correspond à ces filtres.', true);
   if (!RP.cols.size) return toast('Cochez au moins une colonne.', true);
   const R = RAP.rapport(rows, F, { titre: $('r-titre').value, groupe: RP.groupe, cols: [...RP.cols], source: S.meta ? S.meta.dernierImport : '' });
-  const plans = type === 'pdf' && $('r-plans').checked;
+  const plans = type === 'pdf' && $('r-plans').checked, photos = type === 'pdf' && $('r-photos').checked;
   let msgPlans = '';
   try {
     const r = await OUT.enregistrer(RAP.nomFichier(R, type === 'pdf' ? 'pdf' : 'xlsx'),
       type === 'pdf' ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       async () => {
+        if (photos) {
+          // photos dans l'ordre du tableau ; en cas de souci, le PDF sort quand même, sans photo
+          try {
+            const P = await PHOTOS.charger(R.groupes.flatMap(G => G.lignes.map(l => l.num)), appelRelais, attendre);
+            R.photos = P.photos;
+            if (P.erreurs) msgPlans = 'Photos : ' + P.erreurs + ' photo(s) non récupérée(s). ';
+            else if (!P.photos.length) msgPlans = 'Aucune photo dans BatiScript pour ces réserves. ';
+          } catch (e) { console.warn('Photos des réserves :', e); msgPlans = 'PDF fabriqué sans les photos (' + (e && e.message ? e.message : e) + '). '; }
+        }
         if (plans) {
           const d = await avecPlans({ lignes: rows });
-          R.plans = d.plans || []; msgPlans = d._plansMsg || '';
+          R.plans = d.plans || []; msgPlans += d._plansMsg || '';
         }
+        attendre(type === 'pdf' ? 'Fabrication du PDF…' : 'Fabrication du fichier Excel…');
         return type === 'pdf' ? RAP.pdf(R) : RAP.excel(R);
       },
       () => attendre(type === 'pdf' ? 'Fabrication du PDF…' : 'Fabrication du fichier Excel…'));
