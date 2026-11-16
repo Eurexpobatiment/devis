@@ -295,7 +295,8 @@ function dessinerDevis() {
       '<div class="badges">' + b + '</div>' +
       '<div class="montant">' + L.euros(d.ht) + '<small>HT · ' + L.euros(d.ttc) + ' TTC</small></div>' +
       '<div class="actions">' +
-      '<button class="btn petit plein" data-pdf="' + esc(s) + '">PDF</button>' +
+      '<button class="btn petit plein" data-pdf="' + esc(s) + '" data-plans="1" title="Devis suivi des plans des réserves (pastilles numérotées)">PDF avec plans</button>' +
+      '<button class="btn petit" data-pdf="' + esc(s) + '" title="Devis seul, sans les plans des réserves">PDF sans plan</button>' +
       '<button class="btn petit" data-xls="' + esc(s) + '">Excel</button>' +
       '<button class="btn petit" data-detail="' + esc(s) + '">Voir les réserves</button>' +
       '<button class="btn petit" data-envoye="' + esc(s) + '" title="Fige le devis et le range dans l\'historique">Marquer envoyé</button>' +
@@ -313,7 +314,7 @@ function dessinerHisto() {
     const envoye = L.norm(r.statut) === 'envoye';
     const d = devisHisto(r);
     const ht = d ? d.ht : r.ht, ttc = d ? d.ttc : r.ttc;
-    const pdf = d ? '<button class="btn petit" data-hpdf="' + esc(r.id) + '">PDF</button><button class="btn petit" data-hxls="' + esc(r.id) + '">Excel</button>'
+    const pdf = d ? '<button class="btn petit" data-hpdf="' + esc(r.id) + '" data-plans="1" title="Devis suivi des plans des réserves">PDF avec plans</button><button class="btn petit" data-hpdf="' + esc(r.id) + '" title="Devis seul, sans les plans des réserves">PDF sans plan</button><button class="btn petit" data-hxls="' + esc(r.id) + '">Excel</button>'
       : (r.url ? '<a class="btn petit" href="' + esc(r.url) + '" target="_blank" rel="noopener">PDF (Drive)</a>' : '');
     return '<tr><td>' + esc(r.num) + '</td><td>' + esc(r.salon) + '</td><td>' + esc(r.date) + '</td><td>' +
       (envoye ? '<span class="badge">Envoyé' + (r.envoyeLe ? ' le ' + esc(r.envoyeLe) : '') + '</span>' : '<span class="badge orange">Réserves absentes de l\'import</span>') +
@@ -424,12 +425,12 @@ async function reprendre(fichier) {
 }
 
 /* ---------- Actions sur les devis ---------- */
-async function sortir(d, type) {
+async function sortir(d, type, plans) {
   if (!d) return;
   try {
     const r = await OUT.enregistrer(OUT.nomFichier(d, type === 'pdf' ? 'pdf' : 'xlsx'),
       type === 'pdf' ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      () => type === 'pdf' ? avecPlans(d).then(OUT.pdf) : OUT.excel(d),
+      () => type === 'pdf' ? (plans ? avecPlans(d).then(OUT.pdf) : OUT.pdf(d)) : OUT.excel(d),
       () => attendre(type === 'pdf' ? 'Fabrication du PDF…' : 'Fabrication du fichier Excel…'));
     if (r === 'annule') return;
     if (type === 'pdf' && d._plansMsg) toast((r === 'enregistre' ? 'Fichier enregistré. ' : '') + d._plansMsg, true);
@@ -808,7 +809,7 @@ $('filtre-histo').addEventListener('input', dessinerHisto);
 $('vue-devis').addEventListener('click', ev => {
   const b = ev.target.closest('button'); if (!b) return;
   if (b.id === 'reprise') return choisirReprise();
-  if (b.dataset.pdf) sortir(devisPour(b.dataset.pdf), 'pdf');
+  if (b.dataset.pdf) sortir(devisPour(b.dataset.pdf), 'pdf', !!b.dataset.plans);
   if (b.dataset.xls) sortir(devisPour(b.dataset.xls), 'xls');
   if (b.dataset.detail) detail(b.dataset.detail);
   if (b.dataset.envoye) marquerEnvoye(b.dataset.envoye);
@@ -817,7 +818,7 @@ $('vue-devis').addEventListener('click', ev => {
 $('corps-histo').addEventListener('click', ev => {
   const b = ev.target.closest('button'); if (!b) return;
   const r = id => S.registre.find(x => x.id === id);
-  if (b.dataset.hpdf) sortir(devisHisto(r(b.dataset.hpdf)), 'pdf');
+  if (b.dataset.hpdf) sortir(devisHisto(r(b.dataset.hpdf)), 'pdf', !!b.dataset.plans);
   if (b.dataset.hxls) sortir(devisHisto(r(b.dataset.hxls)), 'xls');
   if (b.dataset.brouillon) remettreBrouillon(b.dataset.brouillon);
 });
