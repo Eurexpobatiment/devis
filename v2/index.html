@@ -80,6 +80,26 @@
   .champ input, .champ textarea { font: 14px Lato, Arial, sans-serif; border: 1px solid var(--ligne); border-radius: 8px; padding: 9px; color: var(--saisie); }
   .bandeau { background: #FDF3E1; border: 1px solid var(--orange); border-radius: 10px; padding: 14px 18px; margin-bottom: 18px; display: flex; gap: 14px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
   .pied { font-size: 12px; color: var(--gris); margin-top: 26px; }
+  .filtres { background: var(--blanc); border-radius: 10px; padding: 12px 14px; margin-bottom: 14px; display: flex; gap: 8px 10px; flex-wrap: wrap; align-items: flex-end; }
+  .filtres .lib { font-size: 12px; color: var(--gris); display: flex; flex-direction: column; gap: 3px; }
+  .filtres .lib input, .filtres .lib select { font: 13px Lato, Arial, sans-serif; border: 1px solid var(--ligne); border-radius: 8px; padding: 7px 9px; color: var(--encre); background: var(--blanc); }
+  .filtres .coche { font-size: 13px; display: flex; align-items: center; gap: 6px; padding: 7px 0; }
+  .multi { position: relative; }
+  .multi summary { list-style: none; cursor: pointer; font: 13px Lato, Arial, sans-serif; border: 1px solid var(--ligne); border-radius: 8px; padding: 7px 10px; background: var(--blanc); white-space: nowrap; user-select: none; }
+  .multi summary::-webkit-details-marker { display: none; }
+  .multi summary::after { content: ' ▾'; color: var(--gris); }
+  .multi summary b { color: var(--vert-fonce); margin-left: 4px; }
+  .multi.actif summary { background: var(--jaune); border-color: var(--orange); }
+  .multi .liste { position: absolute; z-index: 5; top: calc(100% + 4px); left: 0; background: var(--blanc); border: 1px solid var(--ligne); border-radius: 10px; box-shadow: 0 8px 24px rgba(15,23,42,.16); padding: 8px; min-width: 240px; max-width: 420px; max-height: 340px; overflow: auto; }
+  .multi .outils { display: flex; gap: 8px; align-items: center; justify-content: space-between; font-size: 12px; margin-bottom: 6px; }
+  .multi .outils input { flex: 1; min-width: 0; font: 12.5px Lato, Arial, sans-serif; border: 1px solid var(--ligne); border-radius: 6px; padding: 5px 7px; }
+  .multi label { display: flex; gap: 7px; align-items: flex-start; font-size: 13px; padding: 4px 4px; border-radius: 5px; cursor: pointer; }
+  .multi label:hover { background: var(--fond); }
+  .multi label span { flex: 1; overflow-wrap: anywhere; } .multi label i { font-style: normal; color: var(--gris); font-size: 12px; }
+  tr.groupe td { background: #E6F6F2; color: var(--vert-fonce); font-weight: 700; }
+  #r-tete th, #r-corps td.fixe { white-space: nowrap; }
+  #vue-rapport .tableau { max-height: calc(100vh - 150px); } #vue-rapport td { overflow-wrap: break-word; } #r-corps td.nc { color: var(--alerte); font-weight: 700; }
+  .synthese { background: var(--blanc); border-radius: 10px; padding: 12px 14px; margin-bottom: 14px; display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
   .zone-depot { background: var(--blanc); border: 2px dashed var(--ligne); border-radius: 12px; padding: 36px; text-align: center; }
 </style>
 </head>
@@ -91,6 +111,7 @@
 <nav id="nav" style="display:none">
   <button data-vue="devis" class="actif">Devis</button>
   <button data-vue="historique">Historique</button>
+  <button data-vue="rapport">Édition de rapport</button>
   <button data-vue="import">Import manuel</button>
   <button data-vue="bpu">BPU</button>
   <button data-vue="mots">Mots-clés</button>
@@ -129,6 +150,27 @@
       <thead><tr><th style="width:120px">N° devis</th><th>Salon</th><th style="width:100px">Date devis</th><th style="width:150px">Statut</th><th class="num" style="width:110px">Total HT</th><th class="num" style="width:110px">Total TTC</th><th style="width:280px"></th></tr></thead>
       <tbody id="corps-histo"></tbody>
     </table></div>
+  </section>
+
+  <section id="vue-rapport" class="vue">
+    <div class="barre">
+      <div><h2>Édition de rapport</h2><p class="aide">Toutes les réserves de la dernière synchronisation BatiScript : tous les événements, y compris ceux exclus des devis (régie, maintenance…) et les réserves abandonnées. Choisissez les filtres, le regroupement et les colonnes, puis éditez le rapport. Un filtre sans rien de coché prend tout.</p></div>
+      <div class="actions"><button class="btn" id="r-raz">Effacer les filtres</button><button class="btn plein" id="r-pdf">PDF</button><button class="btn" id="r-xls">Excel</button></div>
+    </div>
+    <div class="filtres" id="r-filtres"></div>
+    <div class="filtres">
+      <label class="lib">Créée du<input type="date" id="r-du"></label>
+      <label class="lib">au<input type="date" id="r-au"></label>
+      <label class="lib">Recherche (n°, constat, observation…)<input type="search" id="r-txt" placeholder="ex. moquette" style="min-width:210px"></label>
+      <label class="lib">Regrouper par<select id="r-groupe"></select></label>
+      <div class="lib">Colonnes<details class="multi" id="r-cols"><summary>Choisir <b></b></summary><div class="liste"></div></details></div>
+      <label class="lib" style="flex:1;min-width:220px">Titre du rapport<input type="text" id="r-titre" placeholder="Rapport des réserves"></label>
+      <label class="coche" title="Ajoute au PDF une page par plan, avec une pastille numérotée par réserve du rapport"><input type="checkbox" id="r-plans"> Plans dans le PDF</label>
+    </div>
+    <div class="kpis" id="r-kpis"></div>
+    <div id="r-synthese"></div>
+    <div class="tableau"><table><thead id="r-tete"></thead><tbody id="r-corps"></tbody></table></div>
+    <p class="aide" id="r-note" style="margin-top:8px"></p>
   </section>
 
   <section id="vue-import" class="vue">
@@ -216,8 +258,9 @@ const CONFIG = {
 
 import * as FB from './fb.js?v=6';
 import * as L from './logic.js?v=3';
-import * as OUT from './sortie.js?v=6';
+import * as OUT from './sortie.js?v=7';
 import * as PLANS from './plans.js?v=1';
+import * as RAP from './rapport.js?v=1';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -264,7 +307,7 @@ function devisHisto(reg) {
 let dessinPrevu = false;
 function dessiner() {
   if (dessinPrevu) return; dessinPrevu = true;
-  requestAnimationFrame(() => { dessinPrevu = false; recalculer(); dessinerDevis(); dessinerHisto(); if (!BPU_EDIT) dessinerBpu(); if (!MOTS_EDIT) dessinerMots(); if (!PARAM_EDIT) remplirParam(); });
+  requestAnimationFrame(() => { dessinPrevu = false; recalculer(); dessinerDevis(); dessinerHisto(); dessinerRapport(); if (!BPU_EDIT) dessinerBpu(); if (!MOTS_EDIT) dessinerMots(); if (!PARAM_EDIT) remplirParam(); });
 }
 
 function dessinerDevis() {
@@ -686,6 +729,131 @@ $('modale-sauver').addEventListener('click', async () => {
   toast(ops.length + ' ligne(s) enregistrée(s).');
   $('modale').classList.remove('ouverte'); MOD = null;
 });
+
+/* ---------- Édition de rapport ---------- */
+const RP = { sel: {}, groupe: 'ev', cols: new Set(RAP.COLS_DEF), lignes: [] };
+RAP.DIMS.forEach(d => { RP.sel[d.k] = new Set(); });
+try {
+  const g = JSON.parse(localStorage.getItem('devis-rapport') || '{}');
+  if (Array.isArray(g.cols) && g.cols.length) RP.cols = new Set(g.cols.filter(k => RAP.COLS.some(c => c.k === k)));
+  if (typeof g.groupe === 'string' && RAP.GROUPES.some(x => x[0] === g.groupe)) RP.groupe = g.groupe;
+} catch (e) {}
+const garderRapport = () => { try { localStorage.setItem('devis-rapport', JSON.stringify({ cols: [...RP.cols], groupe: RP.groupe })); } catch (e) {} };
+$('r-groupe').innerHTML = RAP.GROUPES.map(g => '<option value="' + g[0] + '">' + esc(g[1]) + '</option>').join('');
+$('r-groupe').value = RP.groupe;
+$('r-cols').querySelector('.liste').innerHTML = RAP.COLS.map(c => '<label><input type="checkbox" value="' + c.k + '"' + (RP.cols.has(c.k) ? ' checked' : '') + '><span>' + esc(c.lib) + '</span></label>').join('');
+
+const filtreRapport = () => ({ sel: RP.sel, du: RAP.jourIso($('r-du').value), au: RAP.jourIso($('r-au').value), txt: $('r-txt').value });
+function etiquette(det, k) {
+  const s = RP.sel[k], v = [...s];
+  det.querySelector('summary b').textContent = !v.length ? 'tous' : v.length === 1 ? (v[0].length > 26 ? v[0].slice(0, 25) + '…' : v[0]) : v.length + ' choisis';
+  det.classList.toggle('actif', v.length > 0);
+}
+// Listes de filtres : refaites quand les réserves changent (les choix et les listes ouvertes sont gardés)
+function dessinerRapport() {
+  RP.lignes = RAP.lignes(S.reserves, motsListe(), S.bpu, param());
+  const ouverts = [...$('r-filtres').querySelectorAll('details[open]')].map(d => d.dataset.dim);
+  const cherche = {}; $('r-filtres').querySelectorAll('.outils input').forEach(i => { cherche[i.closest('details').dataset.dim] = i.value; });
+  $('r-filtres').innerHTML = RAP.DIMS.map(d => {
+    const opts = RAP.options(RP.lignes, d.k), vus = new Set(opts.map(o => o[0]));
+    [...RP.sel[d.k]].forEach(v => { if (!vus.has(v)) RP.sel[d.k].delete(v); });   // valeur disparue de l'import
+    return '<details class="multi" data-dim="' + d.k + '"' + (ouverts.indexOf(d.k) >= 0 ? ' open' : '') + '><summary>' + esc(d.lib) + ' <b></b></summary><div class="liste">' +
+      '<div class="outils">' + (opts.length > 10 ? '<input placeholder="chercher…" value="' + esc(cherche[d.k] || '') + '">' : '<span></span>') + '<span class="lien" data-rien>tout décocher</span></div>' +
+      opts.map(o => '<label><input type="checkbox" value="' + esc(o[0]) + '"' + (RP.sel[d.k].has(o[0]) ? ' checked' : '') + '><span>' + esc(o[0]) + '</span><i>' + o[1] + '</i></label>').join('') +
+      '</div></details>';
+  }).join('');
+  $('r-filtres').querySelectorAll('details').forEach(det => { etiquette(det, det.dataset.dim); chercherDans(det); });
+  majRapport();
+}
+function chercherDans(det) {
+  const i = det.querySelector('.outils input'), f = i ? L.norm(i.value) : '';
+  det.querySelectorAll('label').forEach(l => { l.style.display = !f || L.norm(l.textContent).indexOf(f) >= 0 ? '' : 'none'; });
+}
+const MAX_ECRAN = 1500;
+function majRapport() {
+  const rows = RAP.filtrer(RP.lignes, filtreRapport());
+  const R = RAP.rapport(rows, filtreRapport(), { titre: $('r-titre').value, groupe: RP.groupe, cols: [...RP.cols] });
+  const nb = R.cols.length;
+  $('r-cols').querySelector('summary b').textContent = nb + ' / ' + RAP.COLS.length;
+  const distinct = k => new Set(rows.map(l => RAP.valeur(l, k))).size;
+  const aCompl = rows.filter(l => !l.connu || l.pu === null).length;
+  $('r-kpis').innerHTML =
+    '<div class="kpi"><div class="val">' + rows.length + '</div><div class="lib">réserve(s) sur ' + RP.lignes.length + '</div></div>' +
+    '<div class="kpi"><div class="val">' + L.euros(R.ht) + '</div><div class="lib">montant HT estimé (BPU)</div></div>' +
+    '<div class="kpi"><div class="val">' + distinct('ev') + '</div><div class="lib">événement(s)</div></div>' +
+    '<div class="kpi"><div class="val">' + distinct('hall') + '</div><div class="lib">hall(s) / zone(s)</div></div>' +
+    '<div class="kpi" style="border-left-color:' + (aCompl ? '#F0AE40' : '#00AB89') + '"><div class="val">' + aCompl + '</div><div class="lib">non classée(s) ou sans prix</div></div>';
+  $('r-synthese').innerHTML = R.groupeLib && R.groupes.length > 1 && R.groupes.length <= 40
+    ? '<div class="synthese"><span class="meta">Par ' + esc(R.groupeLib.toLowerCase()) + ' :</span>' + R.groupes.map(G => '<span class="badge" title="' + esc(L.euros(G.ht) + ' HT') + '">' + esc(G.nom || '—') + ' · ' + G.n + '</span>').join('') + '</div>' : '';
+  $('r-tete').innerHTML = '<tr>' + R.cols.map(c => '<th class="' + (c.al === 'right' ? 'num' : '') + '">' + esc(c.lib) + '</th>').join('') + '</tr>';
+  if (!rows.length || !nb) {
+    $('r-corps').innerHTML = '<tr><td colspan="' + Math.max(1, nb) + '" class="aide" style="padding:18px">' + (!nb ? 'Cochez au moins une colonne.' : RP.lignes.length ? 'Aucune réserve ne correspond à ces filtres.' : 'Aucune réserve : lancez une synchronisation BatiScript (onglet Devis).') + '</td></tr>';
+    $('r-note').textContent = ''; return;
+  }
+  let n = 0; const h = [];
+  for (const G of R.groupes) {
+    if (n >= MAX_ECRAN) break;
+    if (R.groupeLib) h.push('<tr class="groupe"><td colspan="' + nb + '">' + esc(G.nom || '—') + ' · ' + G.n + ' réserve' + (G.n > 1 ? 's' : '') + (R.avecMt ? ' · ' + L.euros(G.ht) + ' HT' : '') + '</td></tr>');
+    for (const l of G.lignes) {
+      if (n++ >= MAX_ECRAN) break;
+      h.push('<tr>' + R.cols.map(c => '<td class="' + (c.al === 'right' ? 'num fixe' : c.al === 'center' ? 'fixe' : c.k === 'des' && !l.connu ? 'nc' : '') + '"' + (c.al === 'center' ? ' style="text-align:center"' : '') + '>' + esc(RAP.texte(l, c)) + '</td>').join('') + '</tr>');
+    }
+  }
+  $('r-corps').innerHTML = h.join('');
+  $('r-note').textContent = rows.length > MAX_ECRAN ? 'Aperçu limité aux ' + MAX_ECRAN + ' premières réserves ; le PDF et l\'Excel les contiennent toutes (' + rows.length + ').' : '';
+}
+$('r-filtres').addEventListener('change', ev => {
+  const t = ev.target, det = t.closest('details'); if (!det || t.type !== 'checkbox') return;
+  const s = RP.sel[det.dataset.dim]; if (t.checked) s.add(t.value); else s.delete(t.value);
+  etiquette(det, det.dataset.dim); majRapport();
+});
+$('r-filtres').addEventListener('input', ev => { if (ev.target.closest('.outils')) chercherDans(ev.target.closest('details')); });
+$('r-filtres').addEventListener('click', ev => {
+  if (ev.target.dataset.rien === undefined) return;
+  const det = ev.target.closest('details'); RP.sel[det.dataset.dim].clear();
+  det.querySelectorAll('input[type=checkbox]').forEach(c => { c.checked = false; });
+  etiquette(det, det.dataset.dim); majRapport();
+});
+$('r-cols').addEventListener('change', ev => {
+  const t = ev.target; if (t.type !== 'checkbox') return;
+  if (t.checked) RP.cols.add(t.value); else RP.cols.delete(t.value);
+  garderRapport(); majRapport();
+});
+$('r-groupe').addEventListener('change', () => { RP.groupe = $('r-groupe').value; garderRapport(); majRapport(); });
+['r-du', 'r-au', 'r-txt', 'r-titre'].forEach(id => $(id).addEventListener('input', majRapport));
+$('r-raz').addEventListener('click', () => {
+  RAP.DIMS.forEach(d => RP.sel[d.k].clear());
+  $('r-du').value = $('r-au').value = $('r-txt').value = '';
+  dessinerRapport();
+});
+// une liste ouverte se referme quand on clique ailleurs
+document.addEventListener('click', ev => { document.querySelectorAll('details.multi[open]').forEach(d => { if (!d.contains(ev.target)) d.open = false; }); });
+
+async function sortirRapport(type) {
+  const F = filtreRapport(), rows = RAP.filtrer(RP.lignes, F);
+  if (!rows.length) return toast('Aucune réserve ne correspond à ces filtres.', true);
+  if (!RP.cols.size) return toast('Cochez au moins une colonne.', true);
+  const R = RAP.rapport(rows, F, { titre: $('r-titre').value, groupe: RP.groupe, cols: [...RP.cols], source: S.meta ? S.meta.dernierImport : '' });
+  const plans = type === 'pdf' && $('r-plans').checked;
+  let msgPlans = '';
+  try {
+    const r = await OUT.enregistrer(RAP.nomFichier(R, type === 'pdf' ? 'pdf' : 'xlsx'),
+      type === 'pdf' ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      async () => {
+        if (plans) {
+          const d = await avecPlans({ lignes: rows });
+          R.plans = d.plans || []; msgPlans = d._plansMsg || '';
+        }
+        return type === 'pdf' ? RAP.pdf(R) : RAP.excel(R);
+      },
+      () => attendre(type === 'pdf' ? 'Fabrication du PDF…' : 'Fabrication du fichier Excel…'));
+    if (r === 'annule') return;
+    if (msgPlans) toast((r === 'enregistre' ? 'Fichier enregistré. ' : '') + msgPlans, true);
+    else if (r === 'enregistre') toast('Fichier enregistré.');
+  } catch (e) { toast(e && e.message ? e.message : String(e), true); } finally { fini(); }
+}
+$('r-pdf').addEventListener('click', () => sortirRapport('pdf'));
+$('r-xls').addEventListener('click', () => sortirRapport('xls'));
 
 /* ---------- BPU ---------- */
 let BPU_EDIT = null; // copie en cours de modification

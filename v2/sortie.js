@@ -2,9 +2,9 @@
  * puis enregistrés là où la personne le choisit. */
 import { euros } from './logic.js?v=1';
 
-const C = { vert: '#00AB89', fonce: '#004C46', clair: '#F5F5F4', texte: '#334155', alerte: '#C00000', accent: '#F0AE40', gris: '#78716C' };
-const EMETTEUR = 'GL events Lyon – Eurexpo Lyon';
-const SITES = 'Centre de congrès de Lyon · Eurexpo Lyon · La Sucrière · Matmut Stadium';
+export const C = { vert: '#00AB89', fonce: '#004C46', clair: '#F5F5F4', texte: '#334155', alerte: '#C00000', accent: '#F0AE40', gris: '#78716C' };
+export const EMETTEUR = 'GL events Lyon – Eurexpo Lyon';
+export const SITES = 'Centre de congrès de Lyon · Eurexpo Lyon · La Sucrière · Matmut Stadium';
 
 const charges = {};
 function script(url) {
@@ -14,7 +14,7 @@ function script(url) {
     document.head.appendChild(s);
   });
 }
-async function pdfmake() {
+export async function pdfmake() {
   await script('https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.10/pdfmake.min.js');
   await script('https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.10/vfs_fonts.min.js');
   return window.pdfMake;
@@ -24,7 +24,7 @@ export async function sheetjs() {
   return window.XLSX;
 }
 const images = {};
-async function image(nom) {
+export async function image(nom) {
   if (images[nom]) return images[nom];
   const b = await (await fetch(nom)).blob();
   return images[nom] = await new Promise(ok => { const r = new FileReader(); r.onload = () => ok(r.result); r.readAsDataURL(b); });
@@ -37,6 +37,12 @@ function cleHall(plan) {
   const p = String(plan || '');
   const m = /hall\s*(\d+)(?:\.(\d+))?/i.exec(p);
   return m ? [0, Number(m[1]), Number(m[2] || 0), /^\s*hall/i.test(p) ? 0 : 1] : [p ? 1 : 2, 0, 0, 0];
+}
+// Ordre des halls entre deux noms de hall ou de zone (rapports)
+export function cmpHall(a, b) {
+  const x = cleHall(a), y = cleHall(b);
+  for (let i = 0; i < 4; i++) if (x[i] !== y[i]) return x[i] - y[i];
+  return cmpTxt(a, b);
 }
 // Groupe de sous-total : le hall (« Sanitaires Hall 3.2 latéral » → Hall 3.2), sinon la zone elle-même
 export function groupeHall(plan) {
@@ -218,7 +224,7 @@ export async function pdf(d) {
 }
 
 /* Excel sur la trame du PDF (ExcelJS : couleurs, logo, sous-totaux par hall, formules) */
-async function exceljs() {
+export async function exceljs() {
   await script('https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js');
   return window.ExcelJS;
 }
