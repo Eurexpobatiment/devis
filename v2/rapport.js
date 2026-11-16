@@ -251,17 +251,19 @@ export async function pdf(R) {
   const parNum = {}, groupeDe = {};
   R.groupes.forEach((G, i) => G.lignes.forEach(l => { parNum[String(l.num)] = l; groupeDe[String(l.num)] = i; }));
   function grillePhotos(photos, titre) {
-    const PAR = 4, cases = photos.map(p => {
+    // photos au plus grand : toute la largeur de la case, 2 rangées par page ; cases serrées (2 pt de marge de chaque côté)
+    const PAR = 4, LARG = Math.floor((W - 64) / PAR) - 4, cases = photos.map(p => {
       const l = parNum[p.num] || {};
       return { stack: [
-        { image: p.img, fit: [180, 132], alignment: 'center' },
+        { image: p.img, fit: [LARG, 205], alignment: 'center' },
         { text: [{ text: 'N° ' + p.num + (p.n > 1 ? ' (' + (p.i + 1) + '/' + p.n + ')' : ''), bold: true, color: C.fonce }, { text: l.plan ? '  ·  ' + l.plan : '' }], fontSize: 7.5, margin: [0, 3, 0, 0] },
         { text: [l.constat, l.emp].filter(Boolean).join(' · '), fontSize: 7, color: C.gris }
       ], margin: [0, 0, 0, 6] };
     });
     const rangs = [[{ text: [{ text: titre, bold: true, fontSize: 11, color: C.fonce }, { text: '   ' + pluriel(photos.length, 'photo'), fontSize: 8, color: C.gris }], colSpan: PAR, margin: [0, 0, 0, 4] }, '', '', '']];
     for (let i = 0; i < cases.length; i += PAR) { const r = cases.slice(i, i + PAR); while (r.length < PAR) r.push(''); rangs.push(r); }
-    return { table: { headerRows: 1, keepWithHeaderRows: 1, dontBreakRows: true, widths: ['*', '*', '*', '*'], body: rangs }, layout: 'noBorders', margin: [0, 14, 0, 0] };
+    return { table: { headerRows: 1, keepWithHeaderRows: 1, dontBreakRows: true, widths: ['*', '*', '*', '*'], body: rangs },
+      layout: { hLineWidth: () => 0, vLineWidth: () => 0, paddingLeft: () => 2, paddingRight: () => 2, paddingTop: () => 2, paddingBottom: () => 2 }, margin: [0, 14, 0, 0] };
   }
   // Plan : une page par plan (R.plans : [{ nom, img, w, h, nums }])
   function pagePlan(P, rappel) {
