@@ -1,6 +1,6 @@
 /* Devis réserves – Eurexpo · édition de rapport : toutes les réserves de la dernière synchronisation,
  * filtrées (événement, hall, zone, lot, état, entreprise, article BPU, dates, texte), regroupées, puis sorties en PDF ou Excel. */
-import * as L from './logic.js?v=3';
+import * as L from './logic.js?v=4';
 import * as OUT from './sortie.js?v=7';
 
 const C = OUT.C;
@@ -11,6 +11,7 @@ export const DIMS = [
   { k: 'ev', lib: 'Événement', vide: '(sans événement)' },
   { k: 'hall', lib: 'Hall' },
   { k: 'plan', lib: 'Zone / plan', vide: '(sans zone)' },
+  { k: 'emp', lib: 'Emplacement', vide: '(sans emplacement)' },
   { k: 'lot', lib: 'Lot', vide: '(sans lot)' },
   { k: 'etat', lib: 'État', vide: '(sans état)' },
   { k: 'entr', lib: 'Entreprise', vide: '(sans entreprise)' },
@@ -25,6 +26,7 @@ export const COLS = [
   { k: 'num', lib: 'N°', w: 36, xl: 8, al: 'center' },
   { k: 'ev', lib: 'Événement', w: 78, xl: 22 },
   { k: 'plan', lib: 'Hall / zone', w: 70, xl: 20 },
+  { k: 'emp', lib: 'Emplacement', w: 70, xl: 20 },
   { k: 'lot', lib: 'Lot', w: 70, xl: 20 },
   { k: 'constat', lib: 'Constat', w: 110, xl: 28 },
   { k: 'obs', lib: 'Observations', w: 130, xl: 34 },
@@ -38,10 +40,10 @@ export const COLS = [
   { k: 'pu', lib: 'PU HT', w: 52, xl: 12, al: 'right', eur: true },
   { k: 'mt', lib: 'Montant HT', w: 60, xl: 14, al: 'right', eur: true }
 ];
-export const COLS_DEF = ['num', 'ev', 'plan', 'lot', 'constat', 'obs', 'etat', 'des', 'qte', 'mt'];
+export const COLS_DEF = ['num', 'ev', 'plan', 'emp', 'lot', 'constat', 'obs', 'etat', 'des', 'qte', 'mt'];
 
 /* Regroupements proposés */
-export const GROUPES = [['', 'Aucun'], ['ev', 'Événement'], ['hall', 'Hall'], ['plan', 'Zone / plan'], ['lot', 'Lot'], ['etat', 'État'], ['entr', 'Entreprise'], ['art', 'Article BPU']];
+export const GROUPES = [['', 'Aucun'], ['ev', 'Événement'], ['hall', 'Hall'], ['plan', 'Zone / plan'], ['emp', 'Emplacement'], ['lot', 'Lot'], ['etat', 'État'], ['entr', 'Entreprise'], ['art', 'Article BPU']];
 
 // « 16/11/2026 » → 20261116 (0 si la date n'est pas lisible)
 export function jour(t) {
@@ -59,7 +61,7 @@ export function lignes(reserves, mots, bpuListe, param) {
   bpuListe.forEach(b => { if (/^\d{2}\.\d{2}$/.test(String(b.code).trim())) bpu[String(b.code).trim()] = b; });
   return reserves.map(r => {
     const l = L.ligne(r, mots, bpu, param, { force: r.force, qte: r.qte, puForce: r.puForce });
-    l.ev = r.ev || ''; l.entr = r.entr || ''; l.plan = r.plan || ''; l.lot = r.lot || ''; l.etat = r.etat || ''; l.cre = r.cre || '';
+    l.ev = r.ev || ''; l.entr = r.entr || ''; l.emp = r.emp || ''; l.plan = r.plan || ''; l.lot = r.lot || ''; l.etat = r.etat || ''; l.cre = r.cre || '';
     l.hall = OUT.groupeHall(r.plan);
     l.fact = L.facturable(r, param.exclus) ? 'Oui' : 'Non';
     l.art = l.connu ? l.code + ' – ' + l.des : 'Non classé';
@@ -85,7 +87,7 @@ export function filtrer(lignes, F) {
     if (F.du && !(l.jour && l.jour >= F.du)) return false;
     if (F.au && !(l.jour && l.jour <= F.au)) return false;
     if (mots.length) {
-      const t = L.norm([l.num, l.constat, l.obs, l.des, l.code, l.ev, l.plan, l.lot, l.entr].join(' '));
+      const t = L.norm([l.num, l.constat, l.obs, l.des, l.code, l.ev, l.plan, l.emp, l.lot, l.entr].join(' '));
       if (!mots.every(m => t.indexOf(m) >= 0)) return false;
     }
     return true;

@@ -176,7 +176,7 @@
 
   <section id="vue-import" class="vue">
     <div class="barre"><div><h2>Import manuel</h2>
-      <p class="aide">Si la synchronisation BatiScript ne répond pas : BatiScript › Etat des lieux › liste › Rapport (Excel), en incluant tous les états et les colonnes Event, État et Plan, puis déposez le fichier ici. Les réserves remplacent celles de la dernière synchronisation ; les codes, quantités et prix saisis sont conservés.</p></div></div>
+      <p class="aide">Si la synchronisation BatiScript ne répond pas : BatiScript › Etat des lieux › liste › Rapport (Excel), en incluant tous les états et les colonnes Event, État, Plan et Emplacements, puis déposez le fichier ici. Les réserves remplacent celles de la dernière synchronisation ; les codes, quantités et prix saisis sont conservés.</p></div></div>
     <div class="zone-depot"><input type="file" id="fichier-import" accept=".xlsx,.xls,.csv"><p class="aide" style="margin:12px auto 0">Fichier Excel ou CSV, en-têtes en première ligne.</p></div>
   </section>
 
@@ -258,10 +258,10 @@ const CONFIG = {
 /* ========================== */
 
 import * as FB from './fb.js?v=6';
-import * as L from './logic.js?v=3';
+import * as L from './logic.js?v=4';
 import * as OUT from './sortie.js?v=7';
 import * as PLANS from './plans.js?v=1';
-import * as RAP from './rapport.js?v=2';
+import * as RAP from './rapport.js?v=3';
 import * as PHOTOS from './photos.js?v=1';
 
 const $ = id => document.getElementById(id);
@@ -374,8 +374,10 @@ async function appliquerImport(entetes, lignes, source) {
   const rows = L.lireLignesImport(entetes, lignes);
   if (!rows.length) throw new Error('Aucune réserve trouvée dans l\'import.');
   const nums = new Set(rows.map(r => r.num));
+  // l'emplacement (champ du formulaire BatiScript) n'est écrit que si l'import le fournit : un import manuel sans cette colonne ne l'efface pas
+  const aEmp = entetes.some(h => L.norm(h).indexOf('emplacement') === 0);
   const ops = rows.map(r => ({ col: 'DevisReserves', id: r.num, merge: true,
-    data: { num: r.num, ev: r.ev, lot: r.lot, int: r.int, obs: r.obs, cre: r.cre, etat: r.etat, plan: r.plan, entr: r.entr } }));
+    data: Object.assign({ num: r.num, ev: r.ev, lot: r.lot, int: r.int, obs: r.obs, cre: r.cre, etat: r.etat, plan: r.plan, entr: r.entr }, aEmp ? { emp: r.emp } : {}) }));
   S.reserves.filter(r => !nums.has(r.num)).forEach(r => ops.push({ col: 'DevisReserves', id: r.id, suppr: true }));
   await FB.ecrire(ops);
   await FB.majParam('meta', { dernierImport: source });

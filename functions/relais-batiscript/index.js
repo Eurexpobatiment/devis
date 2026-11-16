@@ -11,7 +11,7 @@ admin.initializeApp();
 
 const BASE = 'https://api.batiscript.com/webservices';
 const CHANTIER = 'etat des lieux'; // nom du chantier « EDL eurexpo » dans l'API (sans accents ni majuscules)
-const ENTETES = ['N°', 'Event', 'Lot', 'Intitulé', 'Observations', 'Création', 'État', 'Plan', 'Entreprise'];
+const ENTETES = ['N°', 'Event', 'Lot', 'Intitulé', 'Observations', 'Création', 'État', 'Plan', 'Entreprise', 'Emplacement'];
 const ETATS = { '-1': 'En attente', '1': 'À corriger', '2': 'Corrigée', '3': 'Validée', '4': 'Abandonnée' };
 const ORIGINES = ['https://eurexpobatiment.github.io'];
 const PROPRIETAIRE = 'herve.desgranges@gl-events.com';
@@ -71,6 +71,14 @@ function bsEvent(r) {
   for (const c of r.FormValues || []) if (/^(event|evenement|salon)$/.test(norm(c.Nom))) return String(c.Valeur || '').trim();
   return '';
 }
+// Champ « emplacements » du formulaire BatiScript (texte, ou plusieurs valeurs réunies par des virgules)
+function bsEmplacement(r) {
+  for (const c of r.FormValues || []) if (/^emplacements?$/.test(norm(c.Nom))) {
+    const v = c.Valeur;
+    return (Array.isArray(v) ? v.map(x => x && typeof x === 'object' ? (x.Nom || x.Valeur || x.Libelle || '') : x).filter(Boolean).join(', ') : String(v == null ? '' : v)).trim();
+  }
+  return '';
+}
 function bsDate(iso) {
   if (!iso) return '';
   const d = new Date(String(iso).replace(/\s/g, ''));
@@ -91,7 +99,7 @@ async function reserves() {
   const lignes = Object.keys(res).map(k => {
     const r = res[k], plan = plans[r.IdPlan];
     return [String(r.Numero), bsEvent(r), bsLot(r.Lot, lotsParNom), r.Intitule || '', r.Observations || '',
-      bsDate(r.Date_creation), ETATS[String(r.Etat)] || String(r.Etat), plan ? (plan.NomComplet || plan.Nom || '') : '', r.Entreprise || ''];
+      bsDate(r.Date_creation), ETATS[String(r.Etat)] || String(r.Etat), plan ? (plan.NomComplet || plan.Nom || '') : '', r.Entreprise || '', bsEmplacement(r)];
   }).sort((a, b) => Number(a[0]) - Number(b[0]));
   return { entetes: ENTETES, lignes, quand: frDateHeure(new Date()) };
 }

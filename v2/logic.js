@@ -13,19 +13,19 @@ export const nombre = x => {
 
 export const arrondi = x => Math.round(x * 100) / 100;
 
-// En-têtes de l'export BatiScript (et de l'API) : N°, Event, Lot, Intitulé, Observations, Création, État, Plan, Entreprise
+// En-têtes de l'export BatiScript (et de l'API) : N°, Event, Lot, Intitulé, Observations, Création, État, Plan, Entreprise, Emplacement
 export function lireLignesImport(entetes, lignes) {
   const H = entetes.map(norm);
   const col = n => H.findIndex(x => x === n || x.indexOf(n) === 0);
   const c = {
     num: col('n°'), ev: col('event') >= 0 ? col('event') : col('evenement'), lot: col('lot'),
-    int: col('intitule'), obs: col('observation'), cre: col('creation'), etat: col('etat'), plan: col('plan'), entr: col('entreprise')
+    int: col('intitule'), obs: col('observation'), cre: col('creation'), etat: col('etat'), plan: col('plan'), entr: col('entreprise'), emp: col('emplacement')
   };
   if (c.num < 0 || c.ev < 0 || c.int < 0) throw new Error('Colonnes N°, Event ou Intitulé absentes de l\'import.');
   const g = (r, k) => c[k] >= 0 && r[c[k]] != null ? String(r[c[k]]).trim() : '';
   return lignes.map(r => ({
     num: g(r, 'num'), ev: g(r, 'ev'), lot: g(r, 'lot'), int: g(r, 'int'), obs: g(r, 'obs'),
-    cre: g(r, 'cre'), etat: g(r, 'etat'), plan: g(r, 'plan'), entr: g(r, 'entr')
+    cre: g(r, 'cre'), etat: g(r, 'etat'), plan: g(r, 'plan'), entr: g(r, 'entr'), emp: g(r, 'emp')
   })).filter(r => r.num);
 }
 
