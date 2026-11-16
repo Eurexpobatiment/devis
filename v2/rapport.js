@@ -124,12 +124,12 @@ export function resume(F) {
   return out;
 }
 
-/* Rapport prêt à sortir. o : { titre, groupe, cols: [clés], source } */
+/* Rapport prêt à sortir. o : { titre, sous (sous-titre), garde (page de garde, oui par défaut), groupe, cols: [clés], source } */
 export function rapport(lignesFiltrees, F, o) {
   const G = grouper(lignesFiltrees, o.groupe);
   const cols = COLS.filter(c => o.cols.indexOf(c.k) >= 0);
   let ht = 0; lignesFiltrees.forEach(l => { if (l.mt !== null && l.mt !== undefined) ht += l.mt; });
-  return { titre: String(o.titre || '').trim() || 'Rapport des réserves', filtres: resume(F), groupes: G, cols, n: lignesFiltrees.length, ht: L.arrondi(ht),
+  return { titre: String(o.titre || '').trim() || 'Rapport des réserves', sous: String(o.sous || '').trim(), garde: o.garde !== false, filtres: resume(F), groupes: G, cols, n: lignesFiltrees.length, ht: L.arrondi(ht),
     groupeLib: o.groupe ? (GROUPES.find(g => g[0] === o.groupe) || [])[1] : '', avecMt: cols.some(c => c.k === 'mt'), source: o.source || '', plans: [], photos: [] };
 }
 
@@ -150,20 +150,42 @@ const titreGroupe = (R, G) => (G.nom || '—') + '  ·  ' + G.n + ' réserve' + 
 const bilan = R => R.n + ' réserve' + (R.n > 1 ? 's' : '') + (R.avecMt ? ' · ' + L.euros(R.ht) + ' HT' : '');
 
 /* ---------- PDF ---------- */
+/* Organisation : page de garde (au choix), en-tête et synthèse, puis le détail.
+ * Sans photo ni plan : un seul tableau, avec une ligne de titre par groupe.
+ * Avec photos ou plans : une partie par groupe (par hall, par défaut), dans cet ordre : réserves, photos, plans.
+ * Un plan est rangé dans la partie de ses réserves ; s'il porte des réserves de plusieurs groupes, il va à la fin. */
 export async function pdf(R) {
   const pm = await OUT.pdfmake();
-  const logo = await OUT.image('logo.png');
+  const [logo, photo] = await Promise.all([OUT.image('logo.png'), R.garde ? OUT.image('garde.jpg') : null]);
   const W = 841.89, H = 595.28;
   const edite = new Date().toLocaleDateString('fr-FR');
   const nb = R.cols.length;
-  const ligneOr = { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 205, y2: 0, lineWidth: 1.5, lineColor: C.accent }], margin: [0, 2, 0, 8] };
+  const g0 = R.garde ? 1 : 0;   // pages avant le rapport lui-même
+  const ligneOr = () => ({ canvas: [{ type: 'line', x1: 0, y1: 0, x2: 205, y2: 0, lineWidth: 1.5, lineColor: C.accent }], margin: [0, 2, 0, 8] });
+  const pluriel = (n, mot) => n + ' ' + mot + (n > 1 ? 's' : '');
+
+  const garde = R.garde ? [
+    { text: 'CENTRE DE CONGRÈS DE LYON\nEUREXPO LYON\nLA SUCRIÈRE\nMATMUT STADIUM', absolutePosition: { x: 560, y: 78 },
+      width: 236, alignment: 'right', fontSize: 6.5, color: C.fonce, lineHeight: 1.15 },
+    { image: logo, width: 145, absolutePosition: { x: 30, y: 128 } },
+    { text: 'HOME OF\nEXCELLENCE', absolutePosition: { x: 32, y: 222 }, fontSize: 21, color: C.fonce, lineHeight: 1.05 },
+    { image: photo, width: 285, height: 195, absolutePosition: { x: 374, y: 116 } },
+    { stack: [
+      { text: R.titre, bold: true, fontSize: R.titre.length > 60 ? 14 : 18, color: C.fonce },
+      R.sous ? { text: R.sous, bold: true, fontSize: 13, color: C.fonce, margin: [0, 4, 0, 0] } : {},
+      { text: 'Réserves BatiScript · ' + edite, fontSize: 10, color: C.fonce, margin: [0, 14, 0, 0] },
+      { text: bilan(R), fontSize: 9, color: C.fonce, margin: [0, 12, 0, 0] }
+    ], alignment: 'right', absolutePosition: { x: 400, y: 356 }, width: 396 },
+    { text: 'Édité le ' + edite + ' – GL events Lyon', italics: true, fontSize: 7, color: C.texte, absolutePosition: { x: 30, y: 524 } },
+    { text: '', pageBreak: 'after' }
+  ] : [];
 
   const entete = {
     columns: [
       { width: '*', stack: [
         { text: R.titre, bold: true, fontSize: 18, color: C.fonce },
-        { text: 'Réserves BatiScript · ' + bilan(R), fontSize: 10, color: C.texte, margin: [0, 4, 0, 2] },
-        ligneOr,
+        { text: (R.sous ? R.sous + ' · ' : '') + 'Réserves BatiScript · ' + bilan(R), fontSize: 10, color: C.texte, margin: [0, 4, 0, 2] },
+        ligneOr(),
         R.filtres.length ? { stack: R.filtres.map(t => ({ text: t })), fontSize: 8.5 } : { text: 'Toutes les réserves (aucun filtre).', fontSize: 8.5 }
       ] },
       { width: 230, stack: [
@@ -176,10 +198,11 @@ export async function pdf(R) {
 
   const petit = nb > 11;   // beaucoup de colonnes : texte un peu plus petit
   const th = t => ({ text: t, bold: true, color: '#FFFFFF', fillColor: C.fonce, alignment: 'center', fontSize: petit ? 7 : 8 });
-  const contenu = [entete];
+  const contenu = garde.concat([entete]);
 
   // Synthèse par groupe
-  if (R.groupeLib && R.groupes.length > 1) {
+  const synthese = !!(R.groupeLib && R.groupes.length > 1);
+  if (synthese) {
     const s = [[th(R.groupeLib), th('Réserves')].concat(R.avecMt ? [th('Montant HT')] : [])];
     R.groupes.forEach(G => s.push([G.nom || '—', { text: String(G.n), alignment: 'center' }].concat(R.avecMt ? [{ text: L.euros(G.ht), alignment: 'right' }] : [])));
     s.push([{ text: 'Total', bold: true, color: C.fonce }, { text: String(R.n), bold: true, alignment: 'center', color: C.fonce }]
@@ -188,82 +211,115 @@ export async function pdf(R) {
     contenu.push({ table: { headerRows: 1, dontBreakRows: true, widths: [250, 55].concat(R.avecMt ? [80] : []), body: s },
       layout: { fillColor: i => i > 0 && i % 2 === 0 ? C.clair : null, hLineWidth: i => i === 0 ? 0 : 0.4, vLineWidth: () => 0, hLineColor: () => '#E7E5E4', paddingTop: () => 3, paddingBottom: () => 3 },
       margin: [0, 0, 0, 14] });
-    contenu.push({ text: 'Détail des réserves', bold: true, fontSize: 11, color: C.fonce, margin: [0, 0, 0, 5] });
   }
+  const notes = [];
+  if (R.avecMt) notes.push({ text: 'Montants HT estimés avec le bordereau de prix (BPU) remise en état après salon ; les réserves non classées ou sans prix ne sont pas chiffrées.', fontSize: 7.5, italics: true });
+  notes.push({ text: 'Réserves relevées dans BatiScript' + (R.source ? ' – ' + R.source : '') + '. Édité le ' + edite + '.', fontSize: 7.5, italics: true });
 
-  // Détail
+  // Tableau des réserves d'une liste de groupes (titres : une ligne de titre par groupe ; total : ligne de total général)
   const dispo = W - 40 - 24 - nb * 6 - 2, somme = R.cols.reduce((n, c) => n + c.w, 0);
   const widths = R.cols.map(c => Math.floor(c.w * dispo / somme * 10) / 10);
-  const corps = [R.cols.map(c => th(c.lib))];
-  const titres = [];
-  R.groupes.forEach(G => {
-    if (R.groupeLib) {
-      titres.push(corps.length);
-      corps.push([{ text: titreGroupe(R, G), colSpan: nb, bold: true, color: C.fonce, fillColor: '#E6F6F2' }].concat(Array(nb - 1).fill('')));
+  function tableau(groupes, titres, total) {
+    const corps = [R.cols.map(c => th(c.lib))], speciales = [];
+    groupes.forEach(G => {
+      if (titres) {
+        speciales.push(corps.length);
+        corps.push([{ text: titreGroupe(R, G), colSpan: nb, bold: true, color: C.fonce, fillColor: '#E6F6F2' }].concat(Array(nb - 1).fill('')));
+      }
+      G.lignes.forEach(l => corps.push(R.cols.map(c => {
+        const o = { text: texte(l, c), alignment: c.al || 'left' };
+        if (c.k === 'des' && !l.connu) { o.color = C.alerte; o.bold = true; }
+        return o;
+      })));
+    });
+    if (total && R.avecMt && nb > 1) {
+      const f = { bold: true, color: C.fonce, fillColor: '#E6F6F2' };
+      const n = groupes.reduce((x, G) => x + G.n, 0), ht = L.arrondi(groupes.reduce((x, G) => x + G.ht, 0));
+      speciales.push(corps.length);
+      const i = R.cols.findIndex(c => c.k === 'mt');
+      const ligne = R.cols.map(() => Object.assign({ text: '' }, f));
+      if (i > 0) { ligne[0] = Object.assign({ text: total + ' (' + pluriel(n, 'réserve') + ')', colSpan: i, alignment: 'right' }, f); for (let j = 1; j < i; j++) ligne[j] = ''; }
+      ligne[i] = Object.assign({ text: L.euros(ht), alignment: 'right' }, f);
+      corps.push(ligne);
     }
-    G.lignes.forEach(l => corps.push(R.cols.map(c => {
-      const o = { text: texte(l, c), alignment: c.al || 'left' };
-      if (c.k === 'des' && !l.connu) { o.color = C.alerte; o.bold = true; }
-      return o;
-    })));
-  });
-  if (R.avecMt && nb > 1) {
-    const f = { bold: true, color: C.fonce, fillColor: '#E6F6F2' };
-    titres.push(corps.length);
-    const i = R.cols.findIndex(c => c.k === 'mt');
-    const ligne = R.cols.map(() => Object.assign({ text: '' }, f));
-    if (i > 0) { ligne[0] = Object.assign({ text: 'Total (' + R.n + ' réserve' + (R.n > 1 ? 's' : '') + ')', colSpan: i, alignment: 'right' }, f); for (let j = 1; j < i; j++) ligne[j] = ''; }
-    ligne[i] = Object.assign({ text: L.euros(R.ht), alignment: 'right' }, f);
-    corps.push(ligne);
+    let k = 0; const zebre = corps.map((r, i) => i === 0 || speciales.indexOf(i) >= 0 ? (k = 0, false) : (++k % 2 === 0));
+    return { fontSize: petit ? 7 : 8, table: { headerRows: 1, dontBreakRows: true, widths, body: corps },
+      layout: { fillColor: i => zebre[i] ? C.clair : null, hLineWidth: i => i === 0 ? 0 : 0.4, vLineWidth: () => 0, hLineColor: () => '#E7E5E4',
+        paddingTop: () => 3.5, paddingBottom: () => 3.5, paddingLeft: () => 3, paddingRight: () => 3 } };
   }
-  let k = 0; const zebre = corps.map((r, i) => i === 0 || titres.indexOf(i) >= 0 ? (k = 0, false) : (++k % 2 === 0));
-  contenu.push({ fontSize: petit ? 7 : 8, table: { headerRows: 1, dontBreakRows: true, widths, body: corps },
-    layout: { fillColor: i => zebre[i] ? C.clair : null, hLineWidth: i => i === 0 ? 0 : 0.4, vLineWidth: () => 0, hLineColor: () => '#E7E5E4',
-      paddingTop: () => 3.5, paddingBottom: () => 3.5, paddingLeft: () => 3, paddingRight: () => 3 } });
-  if (R.avecMt) contenu.push({ text: 'Montants HT estimés avec le bordereau de prix (BPU) remise en état après salon ; les réserves non classées ou sans prix ne sont pas chiffrées.', fontSize: 7.5, italics: true, margin: [0, 12, 0, 0] });
-  contenu.push({ text: 'Réserves relevées dans BatiScript' + (R.source ? ' – ' + R.source : '') + '. Édité le ' + edite + '.', fontSize: 7.5, italics: true, margin: [0, R.avecMt ? 0 : 12, 0, 0] });
-
-  // Photos des réserves (R.photos : [{ num, i, n, img, w, h }], dans l'ordre du rapport) : 4 par rangée, à la suite du tableau
-  if (R.photos && R.photos.length) {
-    const parNum = {}; R.groupes.forEach(G => G.lignes.forEach(l => { parNum[String(l.num)] = l; }));
-    const PAR = 4, cases = R.photos.map(p => {
+  // Photos (4 par rangée) ; le titre reste avec la première rangée et se répète en haut des pages suivantes
+  const parNum = {}, groupeDe = {};
+  R.groupes.forEach((G, i) => G.lignes.forEach(l => { parNum[String(l.num)] = l; groupeDe[String(l.num)] = i; }));
+  function grillePhotos(photos, titre) {
+    const PAR = 4, cases = photos.map(p => {
       const l = parNum[p.num] || {};
       return { stack: [
         { image: p.img, fit: [180, 132], alignment: 'center' },
         { text: [{ text: 'N° ' + p.num + (p.n > 1 ? ' (' + (p.i + 1) + '/' + p.n + ')' : ''), bold: true, color: C.fonce }, { text: l.plan ? '  ·  ' + l.plan : '' }], fontSize: 7.5, margin: [0, 3, 0, 0] },
-        { text: l.constat || '', fontSize: 7, color: C.gris }
+        { text: [l.constat, l.emp].filter(Boolean).join(' · '), fontSize: 7, color: C.gris }
       ], margin: [0, 0, 0, 6] };
     });
-    const rangs = [];
+    const rangs = [[{ text: [{ text: titre, bold: true, fontSize: 11, color: C.fonce }, { text: '   ' + pluriel(photos.length, 'photo'), fontSize: 8, color: C.gris }], colSpan: PAR, margin: [0, 0, 0, 4] }, '', '', '']];
     for (let i = 0; i < cases.length; i += PAR) { const r = cases.slice(i, i + PAR); while (r.length < PAR) r.push(''); rangs.push(r); }
-    contenu.push({ pageBreak: 'before', columns: [
-      { width: '*', text: 'Photos des réserves', bold: true, fontSize: 13, color: C.fonce },
-      { width: 'auto', text: R.photos.length + ' photo' + (R.photos.length > 1 ? 's' : '') + ' · ' + R.titre, fontSize: 8, color: C.gris, margin: [0, 5, 0, 0] }
-    ] });
-    contenu.push({ canvas: [{ type: 'line', x1: 0, y1: 0, x2: 205, y2: 0, lineWidth: 1.5, lineColor: C.accent }], margin: [0, 3, 0, 8] });
-    contenu.push({ table: { dontBreakRows: true, widths: ['*', '*', '*', '*'], body: rangs }, layout: 'noBorders' });
+    return { table: { headerRows: 1, keepWithHeaderRows: 1, dontBreakRows: true, widths: ['*', '*', '*', '*'], body: rangs }, layout: 'noBorders', margin: [0, 14, 0, 0] };
+  }
+  // Plan : une page par plan (R.plans : [{ nom, img, w, h, nums }])
+  function pagePlan(P, rappel) {
+    const portrait = P.h > P.w * 1.15;
+    return [
+      { pageBreak: 'before', pageOrientation: portrait ? 'portrait' : 'landscape', columns: [
+        { width: '*', text: [{ text: 'Plan des réserves', bold: true, fontSize: 13, color: C.fonce }, { text: '   ' + P.nom, fontSize: 11, color: C.texte }] },
+        { width: 'auto', text: pluriel(P.nums.length, 'réserve') + ' · ' + rappel, fontSize: 8, color: C.gris, margin: [0, 5, 0, 0] }
+      ] },
+      { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 205, y2: 0, lineWidth: 1.5, lineColor: C.accent }], margin: [0, 3, 0, 8] },
+      { image: P.img, fit: portrait ? [H - 64, W - 58 - 40] : [W - 64, H - 58 - 40], alignment: 'center' }
+    ];
   }
 
-  // Plans des réserves (R.plans : [{ nom, img, w, h, nums }]) : une page par plan, rangés par hall
-  (R.plans || []).slice().sort((a, b) => OUT.cmpHall(a.nom, b.nom)).forEach(P => {
-    const portrait = P.h > P.w * 1.15;
-    contenu.push({ pageBreak: 'before', pageOrientation: portrait ? 'portrait' : 'landscape', columns: [
-      { width: '*', text: [{ text: 'Plan des réserves', bold: true, fontSize: 13, color: C.fonce }, { text: '   ' + P.nom, fontSize: 11, color: C.texte }] },
-      { width: 'auto', text: P.nums.length + ' réserve' + (P.nums.length > 1 ? 's' : '') + ' · ' + R.titre, fontSize: 8, color: C.gris, margin: [0, 5, 0, 0] }
-    ] });
-    contenu.push({ canvas: [{ type: 'line', x1: 0, y1: 0, x2: 205, y2: 0, lineWidth: 1.5, lineColor: C.accent }], margin: [0, 3, 0, 8] });
-    contenu.push({ image: P.img, fit: portrait ? [H - 64, W - 58 - 40] : [W - 64, H - 58 - 40], alignment: 'center' });
-  });
+  const photos = R.photos || [], plans = (R.plans || []).slice().sort((a, b) => OUT.cmpHall(a.nom, b.nom));
+  if (!photos.length && !plans.length) {
+    // rapport simple : un seul tableau
+    if (synthese) contenu.push({ text: 'Détail des réserves', bold: true, fontSize: 11, color: C.fonce, margin: [0, 0, 0, 5] });
+    contenu.push(tableau(R.groupes, !!R.groupeLib, 'Total'));
+    contenu.push({ stack: notes, margin: [0, 12, 0, 0] });
+  } else {
+    // une partie par groupe : réserves, photos, plans
+    contenu.push({ stack: notes, margin: [0, synthese ? 0 : 4, 0, 0] });
+    const plansDe = R.groupes.map(() => []), plansFin = [];
+    plans.forEach(P => {
+      const gs = [...new Set(P.nums.map(n => groupeDe[String(n)]).filter(i => i !== undefined))];
+      if (gs.length === 1) plansDe[gs[0]].push(P); else plansFin.push(P);
+    });
+    R.groupes.forEach((G, i) => {
+      const nom = R.groupeLib ? (G.nom || '—') : 'Détail des réserves';
+      contenu.push({ pageBreak: 'before', pageOrientation: 'landscape', columns: [
+        { width: '*', text: nom, bold: true, fontSize: 15, color: C.fonce },
+        { width: 'auto', text: pluriel(G.n, 'réserve') + (R.avecMt ? ' · ' + L.euros(G.ht) + ' HT' : '') + ' · ' + R.titre, fontSize: 8, color: C.gris, margin: [0, 7, 0, 0] }
+      ] });
+      contenu.push(ligneOr());
+      contenu.push(tableau([G], false, R.avecMt ? 'Total ' + (R.groupeLib ? G.nom || '' : '').trim() : ''));
+      const ph = photos.filter(p => groupeDe[p.num] === i);
+      if (ph.length) contenu.push(grillePhotos(ph, 'Photos' + (R.groupeLib ? ' – ' + (G.nom || '—') : '')));
+      plansDe[i].forEach(P => contenu.push(...pagePlan(P, nom)));
+    });
+    plansFin.forEach(P => contenu.push(...pagePlan(P, R.titre)));
+  }
 
   const doc = {
     pageSize: 'A4', pageOrientation: 'landscape', pageMargins: [40, 28, 24, 30],
     info: { title: R.titre, author: OUT.EMETTEUR },
     defaultStyle: { fontSize: 8, color: C.texte, lineHeight: 1.1 },
-    background: (page, taille) => ({ canvas: [{ type: 'rect', x: 0, y: 0, w: 12, h: taille && taille.height ? taille.height : H, color: C.vert }] }),
-    footer: (page, n) => ({ columns: [
+    background: (page, taille) => g0 && page === 1
+      ? { canvas: [
+          { type: 'rect', x: 0, y: 0, w: 374, h: H, color: C.clair },
+          { type: 'rect', x: 374, y: 0, w: W - 374, h: H, color: C.vert },
+          { type: 'rect', x: 233, y: 116, w: 141, h: 195, color: C.fonce }
+        ] }
+      : { canvas: [{ type: 'rect', x: 0, y: 0, w: 12, h: taille && taille.height ? taille.height : H, color: C.vert }] },
+    footer: (page, n) => g0 && page === 1 ? null : { columns: [
       { text: R.titre + ' – ' + OUT.EMETTEUR, fontSize: 7, color: C.gris },
-      { text: 'Page ' + page + ' / ' + n, fontSize: 7, color: C.gris, alignment: 'right' }
-    ], margin: [40, 8, 24, 0] }),
+      { text: 'Page ' + (page - g0) + ' / ' + (n - g0), fontSize: 7, color: C.gris, alignment: 'right' }
+    ], margin: [40, 8, 24, 0] },
     content: contenu
   };
   return new Promise((ok, ko) => { try { pm.createPdf(doc).getBlob(ok); } catch (e) { ko(e); } });

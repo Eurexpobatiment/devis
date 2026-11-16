@@ -154,7 +154,7 @@
 
   <section id="vue-rapport" class="vue">
     <div class="barre">
-      <div><h2>Édition de rapport</h2><p class="aide">Toutes les réserves de la dernière synchronisation BatiScript : tous les événements, y compris ceux exclus des devis (régie, maintenance…) et les réserves abandonnées. Choisissez les filtres, le regroupement et les colonnes, puis éditez le rapport. Un filtre sans rien de coché prend tout.</p></div>
+      <div><h2>Édition de rapport</h2><p class="aide">Toutes les réserves de la dernière synchronisation BatiScript : tous les événements, y compris ceux exclus des devis (régie, maintenance…) et les réserves abandonnées. Choisissez les filtres, le regroupement et les colonnes, puis éditez le rapport. Un filtre sans rien de coché prend tout. Avec les photos ou les plans, le PDF fait une partie par groupe (par hall, par défaut) : les réserves, puis leurs photos, puis leurs plans.</p></div>
       <div class="actions"><button class="btn" id="r-raz">Effacer les filtres</button><button class="btn plein" id="r-pdf">PDF</button><button class="btn" id="r-xls">Excel</button></div>
     </div>
     <div class="filtres" id="r-filtres"></div>
@@ -164,7 +164,9 @@
       <label class="lib">Recherche (n°, constat, observation…)<input type="search" id="r-txt" placeholder="ex. moquette" style="min-width:210px"></label>
       <label class="lib">Regrouper par<select id="r-groupe"></select></label>
       <div class="lib">Colonnes<details class="multi" id="r-cols"><summary>Choisir <b></b></summary><div class="liste"></div></details></div>
-      <label class="lib" style="flex:1;min-width:220px">Titre du rapport<input type="text" id="r-titre" placeholder="Rapport des réserves"></label>
+      <label class="lib" style="flex:1;min-width:200px">Nom du rapport (page de garde)<input type="text" id="r-titre" placeholder="Rapport des réserves"></label>
+      <label class="lib" style="flex:1;min-width:180px">Sous-titre (facultatif)<input type="text" id="r-sous" placeholder="ex. État des lieux de sortie"></label>
+      <label class="coche" title="Première page du PDF sur la trame de vos devis : logo, photo, nom du rapport"><input type="checkbox" id="r-garde" checked> Page de garde</label>
       <label class="coche" title="Ajoute au PDF une page par plan, avec une pastille numérotée par réserve du rapport"><input type="checkbox" id="r-plans"> Plans dans le PDF</label>
       <label class="coche" title="Ajoute au PDF les photos BatiScript des réserves du rapport, à la suite du tableau (4 par rangée)"><input type="checkbox" id="r-photos"> Photos dans le PDF</label>
     </div>
@@ -261,7 +263,7 @@ import * as FB from './fb.js?v=6';
 import * as L from './logic.js?v=4';
 import * as OUT from './sortie.js?v=7';
 import * as PLANS from './plans.js?v=1';
-import * as RAP from './rapport.js?v=3';
+import * as RAP from './rapport.js?v=4';
 import * as PHOTOS from './photos.js?v=1';
 
 const $ = id => document.getElementById(id);
@@ -735,7 +737,7 @@ $('modale-sauver').addEventListener('click', async () => {
 });
 
 /* ---------- Édition de rapport ---------- */
-const RP = { sel: {}, groupe: 'ev', cols: new Set(RAP.COLS_DEF), lignes: [] };
+const RP = { sel: {}, groupe: 'hall', cols: new Set(RAP.COLS_DEF), lignes: [] };
 RAP.DIMS.forEach(d => { RP.sel[d.k] = new Set(); });
 try {
   const g = JSON.parse(localStorage.getItem('devis-rapport') || '{}');
@@ -837,7 +839,7 @@ async function sortirRapport(type) {
   const F = filtreRapport(), rows = RAP.filtrer(RP.lignes, F);
   if (!rows.length) return toast('Aucune réserve ne correspond à ces filtres.', true);
   if (!RP.cols.size) return toast('Cochez au moins une colonne.', true);
-  const R = RAP.rapport(rows, F, { titre: $('r-titre').value, groupe: RP.groupe, cols: [...RP.cols], source: S.meta ? S.meta.dernierImport : '' });
+  const R = RAP.rapport(rows, F, { titre: $('r-titre').value, sous: $('r-sous').value, garde: $('r-garde').checked, groupe: RP.groupe, cols: [...RP.cols], source: S.meta ? S.meta.dernierImport : '' });
   const plans = type === 'pdf' && $('r-plans').checked, photos = type === 'pdf' && $('r-photos').checked;
   let msgPlans = '';
   try {
