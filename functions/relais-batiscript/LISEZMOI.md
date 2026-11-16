@@ -10,6 +10,11 @@ Depuis le 16 nov. 2026, la fonction sert aussi les plans des réserves du devis 
 - `{"plan": "<IdPlan>"}` : le fichier PDF du plan ;
 - `{"diag": true}` : forme des données BatiScript (noms des champs, textes masqués), pour diagnostic.
 
+Photos des réserves (rapports), préparé le 16 nov. 2026 :
+- `{"photos": true}` : nombre de photos de chaque réserve qui en a ;
+- `{"photo": "<n° de réserve>", "i": 0}` : le fichier de la photo ;
+- `{"diag": "photos"}` : ce que répond BatiScript aux adresses essayées pour une photo (code, type, taille).
+
 - Région : europe-west9 (Paris) · URL : https://europe-west9-equipe-batiment.cloudfunctions.net/relais-batiscript
 - Accès : compte Bâtiment connecté (jeton Firebase + fiche `Acces` active) ; jeton App Check vérifié s'il est présent
   (le rendre obligatoire : variable `REQUIRE_APP_CHECK=1`).

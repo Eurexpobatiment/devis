@@ -172,6 +172,71 @@ async function fichierPlan(idPlan) {
   return { type: r.headers.get('content-type') || 'application/octet-stream', data: Buffer.from(await r.arrayBuffer()) };
 }
 
+/* Photos des réserves (rapports PDF)
+ *  - corps { "photos": true } : nombre de photos de chaque réserve qui en a, { "283": 2, … } ;
+ *  - corps { "photo": "<n° de réserve>", "i": 0 } : le fichier de la photo (la 1re si « i » est absent).
+ * La documentation de l'API ne dit pas où se trouvent les fichiers : plusieurs adresses possibles sont essayées,
+ * la première qui renvoie bien une image est retenue pour la suite. */
+let resCache = null, resFin = 0;
+async function bsReserves() {
+  if (resCache && Date.now() < resFin) return resCache;
+  resCache = await bsGet('/public/chantiers/' + await bsChantierId() + '/reserves'); resFin = Date.now() + 300000;
+  return resCache;
+}
+const MODELES_PHOTO = [
+  '/public/chantiers/{chantier}/reserves/{reserve}/photos/{fichier}',
+  '/public/chantiers/{chantier}/reserves/{reserve}/photos/{rang}',
+  '/public/chantiers/{chantier}/photos/{fichier}',
+  '/public/chantiers/{chantier}/reserves/photos/{fichier}',
+  '/public/chantiers/{chantier}/reserves/{reserve}/photo/{fichier}',
+  '/public/reserves/{reserve}/photos/{fichier}',
+  '/public/photos/{fichier}',
+  '/public/v2/chantiers/{chantier}/reserves/{reserve}/photos/{fichier}'
+];
+let modelePhoto = process.env.BATISCRIPT_MODELE_PHOTO || null;
+const cheminPhoto = (modele, chantier, r, i) => modele.replace('{chantier}', encodeURIComponent(chantier)).replace('{reserve}', encodeURIComponent(r.Id))
+  .replace('{fichier}', encodeURIComponent(r.Photos[i].FileName)).replace('{rang}', String(i));
+function typeImage(b) {
+  if (b.length > 3 && b[0] === 0xFF && b[1] === 0xD8) return 'image/jpeg';
+  if (b.length > 8 && b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4E && b[3] === 0x47) return 'image/png';
+  if (b.length > 12 && b.toString('latin1', 0, 4) === 'RIFF' && b.toString('latin1', 8, 12) === 'WEBP') return 'image/webp';
+  return '';
+}
+async function nombresPhotos() {
+  const res = await bsReserves(), nb = {};
+  Object.keys(res).forEach(k => { const n = (res[k].Photos || []).filter(p => p && p.FileName).length; if (n) nb[String(res[k].Numero)] = n; });
+  return { nb, quand: frDateHeure(new Date()) };
+}
+async function fichierPhoto(numero, i) {
+  const res = await bsReserves();
+  const r = Object.keys(res).map(k => res[k]).find(x => String(x.Numero) === String(numero));
+  i = Number(i) || 0;
+  if (!r || !Array.isArray(r.Photos) || !r.Photos[i] || !r.Photos[i].FileName) throw Object.assign(new Error('Photo inconnue'), { code: 404 });
+  const chantier = await bsChantierId(), db = await bsTargetDb();
+  for (const modele of (modelePhoto ? [modelePhoto] : MODELES_PHOTO)) {
+    let url = BASE + cheminPhoto(modele, chantier, r, i);
+    if (db) url += '?target-db=' + encodeURIComponent(db);
+    const rep = await fetch(url, { headers: { Authorization: 'Bearer ' + await bsToken() } });
+    if (rep.status !== 200) continue;
+    const data = Buffer.from(await rep.arrayBuffer()), type = typeImage(data);
+    if (!type) continue;
+    if (!modelePhoto) { modelePhoto = modele; console.log('Adresse des photos BatiScript retenue : ' + modele); }
+    return { type, data };
+  }
+  throw Object.assign(new Error('Photo non fournie par BatiScript'), { code: 502 });
+}
+// Diagnostic : ce que répond BatiScript à chaque adresse possible pour une photo (code, type, taille ; aucun contenu)
+async function diagPhotos() {
+  const res = await bsReserves(), chantier = await bsChantierId();
+  const lr = Object.keys(res).map(k => res[k]);
+  const avec = lr.filter(x => Array.isArray(x.Photos) && x.Photos.some(p => p && p.FileName));
+  const r = avec.find(x => x.Photos[0] && x.Photos[0].FileName);
+  const essais = {};
+  if (r) for (const m of MODELES_PHOTO) essais[m] = await bsEssai(cheminPhoto(m, chantier, r, 0));
+  return { reservesAvecPhotos: avec.length, nbPhotos: avec.reduce((n, x) => n + x.Photos.length, 0), retenue: modelePhoto,
+    nomFichier: r ? forme(r.Photos[0].FileName) + ', ' + String(r.Photos[0].FileName).length + ' car., ' + (/[\/\\]/.test(r.Photos[0].FileName) ? 'avec dossier' : 'sans dossier') : null, essais };
+}
+
 // Compte Bâtiment : même contrôle que les règles Firestore (propriétaire, ou fiche Acces active)
 async function verifierCompte(req) {
   const m = /^Bearer\s+(.+)$/i.exec(req.get('Authorization') || '');
@@ -203,6 +268,22 @@ functions.http('relais', async (req, res) => {
     await verifierAppCheck(req);
     const email = await verifierCompte(req);
     let corps = req.body; if (typeof corps === 'string') { try { corps = JSON.parse(corps); } catch (e) { corps = {}; } }
+    if (corps && corps.diag === 'photos') {
+      const d = await diagPhotos();
+      console.log('Diagnostic BatiScript (photos) envoyé à ' + email);
+      return res.json({ ok: true, diag: d });
+    }
+    if (corps && corps.photos) {
+      const p = await nombresPhotos();
+      console.log('Nombres de photos envoyés à ' + email + ' : ' + Object.keys(p.nb).length + ' réserve(s)');
+      return res.json({ ok: true, res: p });
+    }
+    if (corps && corps.photo !== undefined && corps.photo !== null && corps.photo !== '') {
+      const f = await fichierPhoto(String(corps.photo), corps.i);
+      console.log('Photo ' + (Number(corps.i) || 0) + ' de la réserve ' + corps.photo + ' envoyée à ' + email + ' (' + f.data.length + ' octets)');
+      res.set('Content-Type', f.type); res.set('Cache-Control', 'private, max-age=600');
+      return res.send(f.data);
+    }
     if (corps && corps.diag) {
       const d = await diagnostic();
       console.log('Diagnostic BatiScript (plans) envoyé à ' + email);
