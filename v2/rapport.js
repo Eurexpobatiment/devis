@@ -1,7 +1,7 @@
 /* Devis réserves – Eurexpo · édition de rapport : toutes les réserves de la dernière synchronisation,
  * filtrées (événement, hall, zone, lot, état, entreprise, article BPU, dates, texte), regroupées, puis sorties en PDF ou Excel. */
 import * as L from './logic.js?v=4';
-import * as OUT from './sortie.js?v=7';
+import * as OUT from './sortie.js?v=8';
 
 const C = OUT.C;
 const cmpTxt = (a, b) => String(a || '').localeCompare(String(b || ''), 'fr', { numeric: true, sensitivity: 'base' });
