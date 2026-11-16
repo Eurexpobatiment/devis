@@ -102,7 +102,7 @@ export async function enregistrer(nom, type, fabriquer, pendant) {
 /* d : { salon, num, date, lignes:[{num, plan, constat, obs, code, connu, des, unite, qte, pu, mt}], n, nc, sansPu, ht, tva, ttc, taux, source } */
 export async function pdf(d) {
   const pm = await pdfmake();
-  const [logo, photo] = await Promise.all([image('logo.png'), image('garde.jpg')]);
+  const [logo, photo] = await Promise.all([image('logo.png'), image('Agenda_EurexpoLyon.jpg')]);
   const W = 841.89, H = 595.28;
   const edite = new Date().toLocaleDateString('fr-FR');
 
@@ -111,7 +111,7 @@ export async function pdf(d) {
       width: 236, alignment: 'right', fontSize: 6.5, color: C.fonce, lineHeight: 1.15 },
     { image: logo, width: 145, absolutePosition: { x: 30, y: 128 } },
     { text: 'HOME OF\nEXCELLENCE', absolutePosition: { x: 32, y: 222 }, fontSize: 21, color: C.fonce, lineHeight: 1.05 },
-    { image: photo, width: 285, height: 195, absolutePosition: { x: 374, y: 116 } },
+    { image: photo, width: 285, height: 187, absolutePosition: { x: 374, y: 120 } },
     { stack: [
       { text: 'Devis de remise en état', bold: true, fontSize: 18, color: C.fonce },
       { text: 'Salon ' + d.salon, bold: true, fontSize: 18, color: C.fonce },
