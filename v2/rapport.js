@@ -156,7 +156,7 @@ const bilan = R => R.n + ' réserve' + (R.n > 1 ? 's' : '') + (R.avecMt ? ' · '
  * Un plan est rangé dans la partie de ses réserves ; s'il porte des réserves de plusieurs groupes, il va à la fin. */
 export async function pdf(R) {
   const pm = await OUT.pdfmake();
-  const [logo, photo] = await Promise.all([OUT.image('logo.png'), R.garde ? OUT.image('garde-rapport.jpg') : null]);
+  const [logo, photo] = await Promise.all([OUT.image('logo.png'), R.garde ? OUT.image('Agenda_EurexpoLyon.jpg') : null]);
   const W = 841.89, H = 595.28;
   const edite = new Date().toLocaleDateString('fr-FR');
   const nb = R.cols.length;
@@ -169,7 +169,7 @@ export async function pdf(R) {
       width: 236, alignment: 'right', fontSize: 6.5, color: C.fonce, lineHeight: 1.15 },
     { image: logo, width: 145, absolutePosition: { x: 30, y: 128 } },
     { text: 'HOME OF\nEXCELLENCE', absolutePosition: { x: 32, y: 222 }, fontSize: 21, color: C.fonce, lineHeight: 1.05 },
-    { image: photo, width: 285, height: 195, absolutePosition: { x: 374, y: 116 } },
+    { image: photo, width: 285, height: 187, absolutePosition: { x: 374, y: 120 } },
     { stack: [
       { text: R.titre, bold: true, fontSize: R.titre.length > 60 ? 14 : 18, color: C.fonce },
       R.sous ? { text: R.sous, bold: true, fontSize: 13, color: C.fonce, margin: [0, 4, 0, 0] } : {},
