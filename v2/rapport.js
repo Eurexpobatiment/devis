@@ -134,9 +134,10 @@ export function rapport(lignesFiltrees, F, o) {
     groupeLib: o.groupe ? (GROUPES.find(g => g[0] === o.groupe) || [])[1] : '', avecMt: cols.some(c => c.k === 'mt'), source: o.source || '', plans: [], photos: [] };
 }
 
-// Le fichier porte le nom du rapport
+// Le fichier porte le nom du rapport, suivi du sous-titre s'il y en a un
+const propre = t => String(t || '').replace(/[\\/:*?"<>|]/g, ' ').replace(/\s+/g, ' ').trim();
 export const nomFichier = (R, ext) =>
-  (R.titre.replace(/[\\/:*?"<>|]/g, ' ').replace(/\s+/g, ' ').trim() || 'Rapport des réserves') + '.' + ext;
+  ((propre(R.titre) || 'Rapport des réserves') + (propre(R.sous) ? ' - ' + propre(R.sous) : '')).slice(0, 180) + '.' + ext;
 
 // Texte d'une cellule (écran, PDF) ; Excel garde les nombres
 export function texte(l, c) {
