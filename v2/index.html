@@ -174,6 +174,7 @@
       <label class="lib" style="flex:1;min-width:200px">Nom du rapport (page de garde)<input type="text" id="r-titre" placeholder="Rapport des réserves"></label>
       <label class="lib" style="flex:1;min-width:180px">Sous-titre (facultatif)<input type="text" id="r-sous" placeholder="ex. État des lieux de sortie"></label>
       <label class="coche" title="Première page du PDF sur la trame de vos devis : logo, photo, nom du rapport"><input type="checkbox" id="r-garde" checked> Page de garde</label>
+      <label class="coche" title="Cadre « Signature client » à la fin du PDF : nom, société, date, signature"><input type="checkbox" id="r-signature" checked> Signature client</label>
       <label class="coche" title="Ajoute au PDF une page par plan, avec une pastille numérotée par réserve du rapport"><input type="checkbox" id="r-plans"> Plans dans le PDF</label>
       <label class="coche" title="Ajoute au PDF les photos BatiScript des réserves du rapport, à la suite du tableau (4 par rangée)"><input type="checkbox" id="r-photos"> Photos dans le PDF</label>
     </div>
@@ -270,7 +271,7 @@ import * as FB from './fb.js?v=7';
 import * as L from './logic.js?v=4';
 import * as OUT from './sortie.js?v=8';
 import * as PLANS from './plans.js?v=1';
-import * as RAP from './rapport.js?v=8';
+import * as RAP from './rapport.js?v=9';
 import * as PHOTOS from './photos.js?v=1';
 
 const $ = id => document.getElementById(id);
@@ -856,7 +857,7 @@ function reglagesRapport(avecEv) {
   const sel = {};
   RAP.DIMS.forEach(d => { if ((avecEv || d.k !== 'ev') && RP.sel[d.k].size) sel[d.k] = [...RP.sel[d.k]]; });
   return { sel, groupe: RP.groupe, cols: [...RP.cols], titre: $('r-titre').value.trim(), sous: $('r-sous').value.trim(),
-    garde: $('r-garde').checked, plans: $('r-plans').checked, photos: $('r-photos').checked, avecEv: !!avecEv,
+    garde: $('r-garde').checked, signature: $('r-signature').checked, plans: $('r-plans').checked, photos: $('r-photos').checked, avecEv: !!avecEv,
     du: avecEv ? $('r-du').value : '', au: avecEv ? $('r-au').value : '', txt: avecEv ? $('r-txt').value : '' };
 }
 function appliquerModele(m) {
@@ -867,7 +868,7 @@ function appliquerModele(m) {
   const cols = (m.cols || []).filter(k => RAP.COLS.some(c => c.k === k));
   if (cols.length) { RP.cols = new Set(cols); $('r-cols').querySelectorAll('input').forEach(c => { c.checked = RP.cols.has(c.value); }); }
   $('r-titre').value = m.titre || ''; $('r-sous').value = m.sous || '';
-  $('r-garde').checked = m.garde !== false; $('r-plans').checked = !!m.plans; $('r-photos').checked = !!m.photos;
+  $('r-garde').checked = m.garde !== false; $('r-signature').checked = m.signature !== false; $('r-plans').checked = !!m.plans; $('r-photos').checked = !!m.photos;
   garderRapport(); dessinerRapport();
   // filtres du modèle absents de la synchronisation en cours (dessinerRapport les a retirés)
   const perdus = RAP.DIMS.filter(d => (m.avecEv || d.k !== 'ev') && m.sel && (m.sel[d.k] || []).some(v => !RP.sel[d.k].has(v))).map(d => d.lib.toLowerCase());
@@ -905,7 +906,7 @@ async function sortirRapport(type) {
   const F = filtreRapport(), rows = RAP.filtrer(RP.lignes, F);
   if (!rows.length) return toast('Aucune réserve ne correspond à ces filtres.', true);
   if (!RP.cols.size) return toast('Cochez au moins une colonne.', true);
-  const R = RAP.rapport(rows, F, { titre: $('r-titre').value, sous: $('r-sous').value, garde: $('r-garde').checked, groupe: RP.groupe, cols: [...RP.cols], source: S.meta ? S.meta.dernierImport : '' });
+  const R = RAP.rapport(rows, F, { titre: $('r-titre').value, sous: $('r-sous').value, garde: $('r-garde').checked, signature: $('r-signature').checked, groupe: RP.groupe, cols: [...RP.cols], source: S.meta ? S.meta.dernierImport : '' });
   const plans = type === 'pdf' && $('r-plans').checked, photos = type === 'pdf' && $('r-photos').checked;
   let msgPlans = '';
   try {

@@ -130,13 +130,13 @@ export function rapport(lignesFiltrees, F, o) {
   const cols = COLS.filter(c => o.cols.indexOf(c.k) >= 0);
   let ht = 0; lignesFiltrees.forEach(l => { if (l.mt !== null && l.mt !== undefined) ht += l.mt; });
   return { titre: String(o.titre || '').trim() || 'Rapport des réserves', sous: String(o.sous || '').trim(), garde: o.garde !== false, filtres: resume(F), groupes: G, cols, n: lignesFiltrees.length, ht: L.arrondi(ht),
+    signature: o.signature !== false,
     groupeLib: o.groupe ? (GROUPES.find(g => g[0] === o.groupe) || [])[1] : '', avecMt: cols.some(c => c.k === 'mt'), source: o.source || '', plans: [], photos: [] };
 }
 
-export const nomFichier = (R, ext) => {
-  const d = new Date(), p = n => String(n).padStart(2, '0');
-  return R.titre.replace(/[\\/:*?"<>|]/g, ' ').replace(/\s+/g, ' ').trim() + ' - ' + d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + '.' + ext;
-};
+// Le fichier porte le nom du rapport
+export const nomFichier = (R, ext) =>
+  (R.titre.replace(/[\\/:*?"<>|]/g, ' ').replace(/\s+/g, ' ').trim() || 'Rapport des réserves') + '.' + ext;
 
 // Texte d'une cellule (écran, PDF) ; Excel garde les nombres
 export function texte(l, c) {
@@ -305,6 +305,25 @@ export async function pdf(R) {
       plansDe[i].forEach(P => contenu.push(...pagePlan(P, nom)));
     });
     plansFin.forEach(P => contenu.push(...pagePlan(P, R.titre)));
+  }
+
+  // Cadre « Signature client », à la fin du rapport (jamais coupé entre deux pages)
+  if (R.signature) {
+    const champ = lib => ({ columns: [
+      { width: 'auto', text: lib, fontSize: 8, color: C.texte },
+      { width: '*', canvas: [{ type: 'line', x1: 4, y1: 9, x2: 170, y2: 9, lineWidth: 0.5, lineColor: C.gris }] }
+    ], margin: [0, 0, 0, 9] });
+    contenu.push({ unbreakable: true, margin: [0, 18, 0, 0], columns: [
+      { width: '*', text: '' },
+      { width: 250, table: { widths: ['*'], body: [
+        [{ text: 'Signature client', bold: true, color: '#FFFFFF', fillColor: C.fonce, fontSize: 9, margin: [4, 2, 0, 2] }],
+        [{ stack: [
+          champ('Nom et qualité :'), champ('Société :'), champ('Date :'),
+          { text: 'Signature précédée de la mention « Bon pour accord »', fontSize: 7, italics: true, color: C.gris },
+          { text: '', margin: [0, 62, 0, 0] }
+        ], margin: [4, 6, 4, 0] }]
+      ] }, layout: { hLineWidth: () => 0.8, vLineWidth: () => 0.8, hLineColor: () => C.fonce, vLineColor: () => C.fonce } }
+    ] });
   }
 
   const doc = {
