@@ -309,7 +309,7 @@ import * as OUT from './sortie.js?v=8';
 import * as PLANS from './plans.js?v=1';
 import * as RAP from './rapport.js?v=10';
 import * as PHOTOS from './photos.js?v=1';
-import * as DASH from './dashboard.js?v=2';
+import * as DASH from './dashboard.js?v=3';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -880,7 +880,7 @@ $('r-raz').addEventListener('click', () => {
 });
 /* ---------- Dashboard ---------- */
 // « Voir la liste des réserves » : mêmes filtres dans l'édition de rapport
-DASH.monter($('vue-dashboard'), { versRapport(sel, du, au) {
+DASH.monter($('vue-dashboard'), { attendre, fini, toast, source: () => (S.meta ? S.meta.dernierImport : ''), versRapport(sel, du, au) {
   RAP.DIMS.forEach(d => { RP.sel[d.k] = new Set(sel[d.k] || []); });
   $('r-du').value = du; $('r-au').value = au; $('r-txt').value = '';
   dessinerRapport();

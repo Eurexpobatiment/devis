@@ -3,6 +3,7 @@
 import * as L from './logic.js?v=4';
 import * as RAP from './rapport.js?v=10';
 import * as OUT from './sortie.js?v=8';
+import * as PRES from './presentation.js?v=1';
 
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const cmpTxt = (a, b) => String(a || '').localeCompare(String(b || ''), 'fr', { numeric: true, sensitivity: 'base' });
@@ -49,7 +50,7 @@ export function monter(el, hooks) {
   DB.el = el; DB.hooks = hooks || {};
   el.innerHTML =
     '<div class="barre"><div><h2>Dashboard</h2><p class="aide">État de toutes les réserves de la dernière synchronisation BatiScript, tous événements confondus (régie et maintenance comprises). Choisissez un ou plusieurs filtres ; un filtre sans rien de coché prend tout. Un clic sur une barre ou sur un nom filtre le tableau de bord sur cette valeur (second clic : retire le filtre).</p></div>' +
-    '<div class="actions"><button class="btn" id="d-raz">Effacer les filtres</button><button class="btn plein" id="d-rapport" title="Ouvre l\'onglet Édition de rapport avec les mêmes filtres, pour voir la liste et l\'éditer en PDF ou Excel">Voir la liste des réserves</button></div></div>' +
+    '<div class="actions"><button class="btn" id="d-raz">Effacer les filtres</button><button class="btn" id="d-pptx" title="Présentation PowerPoint du tableau de bord, avec les filtres et la mesure en cours (graphiques modifiables)">Présentation PowerPoint</button><button class="btn plein" id="d-rapport" title="Ouvre l\'onglet Édition de rapport avec les mêmes filtres, pour voir la liste et l\'éditer en PDF ou Excel">Voir la liste des réserves</button></div></div>' +
     '<div class="filtres"><span id="d-filtres" style="display:contents"></span>' +
     '<label class="lib">Créée du<input type="date" id="d-du"></label><label class="lib">au<input type="date" id="d-au"></label>' +
     '<label class="lib">Mesure<select id="d-mesure"><option value="n">Nombre de réserves</option><option value="mt">Montant HT estimé (BPU)</option></select></label></div>' +
@@ -68,6 +69,7 @@ export function monter(el, hooks) {
   ['#d-du', '#d-au'].forEach(s => q(s).addEventListener('input', maj));
   q('#d-mesure').addEventListener('change', () => { DB.mesure = q('#d-mesure').value; maj(); });
   q('#d-raz').addEventListener('click', () => { FILTRES.forEach(k => DB.sel[k].clear()); q('#d-du').value = q('#d-au').value = ''; listes(); maj(); });
+  q('#d-pptx').addEventListener('click', presentation);
   q('#d-rapport').addEventListener('click', () => { if (DB.hooks.versRapport) DB.hooks.versRapport(DB.sel, q('#d-du').value, q('#d-au').value); });
 
   // clic sur une barre, un nom ou une légende : filtre (ou retire le filtre) sur cette valeur
@@ -183,6 +185,27 @@ export function trier(rows, tri) {
     : k === 'etat' ? (a, b) => (classeEtat(a.etat) - classeEtat(b.etat)) || cmpTxt(a.etat, b.etat)
     : (a, b) => cmpTxt(a[k], b[k]);
   return base.sort((a, b) => tri.sens * cmp(a, b));   // tri stable : l'ordre des halls départage
+}
+
+/* ---------- Présentation PowerPoint (filtres et mesure en cours) ---------- */
+export function pourPresentation() {
+  const F = filtre(), rows = RAP.filtrer(DB.lignes, F);
+  const nb = [0, 0, 0, 0, 0, 0]; let ht = 0;
+  rows.forEach(l => { nb[classeEtat(l.etat)]++; if (l.mt !== null && l.mt !== undefined) ht += l.mt; });
+  const levees = nb[2] + nb[3], ev = [...DB.sel.ev];
+  return { titre: 'Dashboard des réserves', suffixe: ev.length === 1 ? ev[0] : '', filtres: RAP.resume(F), mesure: DB.mesure,
+    source: DB.hooks.source ? DB.hooks.source() : '', edite: new Date().toLocaleDateString('fr-FR'), etats: ETATS,
+    n: rows.length, total: DB.lignes.length, nb, levees, taux: pct(levees, rows.length - nb[4]), ht: L.euros(L.arrondi(ht)), E: parEtat(rows),
+    panneaux: PANNEAUX.map(([k, titre]) => ({ titre, R: repartition(rows, k) })), temps: chronologie(rows) };
+}
+async function presentation() {
+  const D = pourPresentation(), dire = (m, err) => { if (DB.hooks.toast) DB.hooks.toast(m, err); };
+  if (!D.n) return dire('Aucune réserve à présenter avec ces filtres.', true);
+  try {
+    const r = await OUT.enregistrer(PRES.nomFichier(D), 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      () => PRES.pptx(D, OUT.image), () => { if (DB.hooks.attendre) DB.hooks.attendre('Fabrication de la présentation PowerPoint…'); });
+    if (r === 'enregistre') dire('Fichier enregistré.');
+  } catch (e) { dire(e && e.message ? e.message : String(e), true); } finally { if (DB.hooks.fini) DB.hooks.fini(); }
 }
 
 /* ---------- Affichage ---------- */
