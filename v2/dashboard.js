@@ -3,7 +3,7 @@
 import * as L from './logic.js?v=4';
 import * as RAP from './rapport.js?v=10';
 import * as OUT from './sortie.js?v=8';
-import * as PRES from './presentation.js?v=1';
+import * as PRES from './presentation.js?v=2';
 
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const cmpTxt = (a, b) => String(a || '').localeCompare(String(b || ''), 'fr', { numeric: true, sensitivity: 'base' });

@@ -55,21 +55,19 @@ export function composer(pptx, D, images) {
     return s;
   };
 
-  /* ----- Page de garde (trame des devis et rapports) ----- */
-  const g = pptx.addSlide();
-  g.background = { color: C.blanc };
-  g.addText('CENTRE DE CONGRÈS DE LYON\nEUREXPO LYON\nLA SUCRIÈRE\nMATMUT STADIUM',
-    { x: W - MX - 4, y: 0.75, w: 4, h: 0.8, align: 'right', fontFace: POLICE, fontSize: 9, color: C.fonce, margin: 0 });
-  g.addImage({ data: img(images.logo), x: MX, y: 1.6, w: 2.3, h: 2.3 * 225 / 700 });
-  g.addText('HOME OF\nEXCELLENCE', { x: MX, y: 2.75, w: 5, h: 1.2, fontFace: POLICE, fontSize: 30, color: C.fonce, margin: 0, valign: 'top' });
-  g.addImage({ data: img(images.photo), x: 5.95, y: 1.5, w: 4.55, h: 4.55 * 558 / 850 });
+  /* ----- Page de garde : même trame que les pages suivantes (bandeau vert, logo, filet, pied de page) ----- */
+  const g = pptx.addSlide({ masterName: 'PAGE' });
+  g.addText('CENTRE DE CONGRÈS DE LYON  ·  EUREXPO LYON  ·  LA SUCRIÈRE  ·  MATMUT STADIUM',
+    { x: MX, y: 0.3, w: W - 2 * MX - 1.8, h: 0.7, fontFace: POLICE, fontSize: 10, color: C.fonce, valign: 'middle', margin: 0 });
+  g.addText('HOME OF\nEXCELLENCE', { x: MX, y: 1.5, w: 5.6, h: 1.2, fontFace: POLICE, fontSize: 30, color: C.fonce, margin: 0, valign: 'top' });
+  g.addShape(pptx.ShapeType.rect, { x: MX, y: 3.05, w: 1.6, h: 0.05, fill: { color: C.vert }, line: { color: C.vert, width: 0 } });
   g.addText([
     { text: D.titre, options: { bold: true, fontSize: 28, color: C.fonce, breakLine: true } },
     { text: D.filtres.length ? D.filtres.map(t => coupe(t, 150)).join('\n') : 'Toutes les réserves, tous événements confondus', options: { fontSize: 13, color: C.fonce, breakLine: true } },
-    { text: nombre(D.n) + ' réserve' + (D.n > 1 ? 's' : '') + (D.n !== D.total ? ' sur ' + nombre(D.total) : '') + ' · ' + D.ht + ' HT estimé (BPU)', options: { fontSize: 12, color: C.texte } }
-  ], { x: 4.3, y: 4.75, w: W - MX - 4.3, h: 1.9, align: 'right', valign: 'top', fontFace: POLICE, margin: 0, paraSpaceAfter: 8, fit: 'shrink' });
-  g.addText('Édité le ' + D.edite + ' – GL events Lyon' + (D.source ? ' · ' + coupe(D.source, 90) : ''),
-    { x: MX, y: H - 0.6, w: 8, h: 0.3, italic: true, fontFace: POLICE, fontSize: 9, color: C.texte, margin: 0 });
+    { text: nombre(D.n) + ' réserve' + (D.n > 1 ? 's' : '') + (D.n !== D.total ? ' sur ' + nombre(D.total) : '') + ' · ' + D.ht + ' HT estimé (BPU)', options: { fontSize: 12, color: C.texte, breakLine: true } },
+    { text: D.source ? coupe(D.source, 90) : '', options: { italic: true, fontSize: 9, color: C.gris } }
+  ], { x: MX, y: 3.35, w: 5.6, h: 3.4, valign: 'top', fontFace: POLICE, margin: 0, paraSpaceAfter: 8, fit: 'shrink' });
+  g.addImage({ data: img(images.photo), x: 6.55, y: 1.5, w: W - MX - 6.55, h: (W - MX - 6.55) * 558 / 850 });
 
   /* ----- Chiffres clés et état des réserves ----- */
   const s1 = page('Chiffres clés', D.filtres.length ? coupe(D.filtres.join(' · '), 110) : 'toutes les réserves');
