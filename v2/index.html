@@ -107,6 +107,37 @@
   #r-tete th, #r-corps td.fixe { white-space: nowrap; }
   #vue-rapport .tableau { max-height: calc(100vh - 150px); } #vue-rapport td { overflow-wrap: break-word; } #r-corps td.nc { color: var(--alerte); font-weight: 700; }
   .synthese { background: var(--blanc); border-radius: 10px; padding: 12px 14px; margin-bottom: 14px; display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  /* Dashboard */
+  .d-carte { background: var(--blanc); border-radius: 10px; padding: 16px 18px; margin-bottom: 16px; box-shadow: 0 1px 2px rgba(15,23,42,.06); min-width: 0; }
+  .d-carte h3 { font: 700 15px Poppins, Arial, sans-serif; color: var(--encre); margin: 0 0 12px; }
+  .d-carte h3 small { font: 400 12.5px Lato, Arial, sans-serif; color: var(--gris); margin-left: 6px; }
+  .d-grille { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(520px, 100%), 1fr)); gap: 0 16px; align-items: start; }
+  .d-bar { display: flex; gap: 2px; height: 14px; border-radius: 4px; overflow: hidden; min-width: 0; }
+  .d-bar i { display: block; min-width: 2px; }
+  .d-bar.gros { height: 30px; border-radius: 6px; }
+  .d-pt { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+  .d-leg { display: flex; flex-wrap: wrap; gap: 6px 8px; margin-top: 12px; font-size: 13px; color: var(--texte); }
+  .d-leg > span { cursor: pointer; padding: 4px 9px; border-radius: 20px; border: 1px solid var(--ligne); white-space: nowrap; }
+  .d-leg > span:hover { background: var(--fond); } .d-leg > span.choisi { background: var(--jaune); border-color: var(--orange); }
+  .d-leg b { color: var(--encre); } .d-leg em { font-style: normal; color: var(--gris); font-size: 12px; }
+  .d-ligne { display: grid; grid-template-columns: minmax(90px, 34%) 1fr 64px; gap: 10px; align-items: center; padding: 4px 6px; margin: 0 -6px; border-radius: 6px; cursor: pointer; font-size: 13px; }
+  .d-ligne:hover { background: var(--fond); } .d-ligne.choisi { background: var(--jaune); }
+  .d-ligne:focus-visible, .d-leg > span:focus-visible { outline: 2px solid var(--vert); outline-offset: 1px; }
+  .d-ligne .nom { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--encre); }
+  .d-ligne .piste { display: block; min-width: 0; } .d-ligne .tot { text-align: right; font-weight: 700; color: var(--encre); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .d-carte > .lien { display: inline-block; margin-top: 8px; font-size: 12.5px; }
+  .d-temps { display: flex; gap: 3px; align-items: stretch; height: 210px; border-bottom: 1px solid var(--ligne); margin-bottom: 20px; }
+  .d-temps .col { flex: 1 1 0; min-width: 0; max-width: 64px; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; position: relative; }
+  .d-temps .col:hover { background: var(--fond); }
+  .d-temps .v { font-size: 11.5px; color: var(--texte); margin-bottom: 3px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .d-temps .pile { width: 70%; max-width: 34px; display: flex; flex-direction: column-reverse; gap: 2px; border-radius: 4px 4px 0 0; overflow: hidden; flex: 0 0 auto; max-height: calc(100% - 18px); }
+  .d-temps .pile i { display: block; min-height: 2px; }
+  .d-temps .x { position: absolute; top: 100%; margin-top: 4px; font-size: 11px; color: var(--gris); white-space: nowrap; }
+  @media (max-width: 600px) { .d-temps .col:nth-child(even) .x { display: none; } }
+  .d-tip { display: none; position: fixed; z-index: 25; background: var(--blanc); border: 1px solid var(--ligne); border-radius: 8px; box-shadow: 0 8px 24px rgba(15,23,42,.16); padding: 9px 11px; font-size: 12.5px; color: var(--texte); min-width: 190px; max-width: 320px; pointer-events: none; }
+  .d-tip b { display: block; color: var(--encre); margin-bottom: 5px; } .d-tip div { display: flex; align-items: center; gap: 2px; padding: 1px 0; }
+  .d-tip em { font-style: normal; margin-left: auto; padding-left: 14px; color: var(--encre); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .d-tip .tot { border-top: 1px solid var(--ligne); margin-top: 4px; padding-top: 4px; font-weight: 700; }
   .zone-depot { background: var(--blanc); border: 2px dashed var(--ligne); border-radius: 12px; padding: 36px; text-align: center; }
 </style>
 </head>
@@ -118,6 +149,7 @@
 <nav id="nav" style="display:none">
   <button data-vue="devis" class="actif">Devis</button>
   <button data-vue="historique">Historique</button>
+  <button data-vue="dashboard">Dashboard</button>
   <button data-vue="rapport">Édition de rapport</button>
   <button data-vue="import">Import manuel</button>
   <button data-vue="bpu">BPU</button>
@@ -158,6 +190,8 @@
       <tbody id="corps-histo"></tbody>
     </table></div>
   </section>
+
+  <section id="vue-dashboard" class="vue"></section>
 
   <section id="vue-rapport" class="vue">
     <div class="barre">
@@ -273,6 +307,7 @@ import * as OUT from './sortie.js?v=8';
 import * as PLANS from './plans.js?v=1';
 import * as RAP from './rapport.js?v=10';
 import * as PHOTOS from './photos.js?v=1';
+import * as DASH from './dashboard.js?v=1';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -778,6 +813,7 @@ function dessinerRapport() {
   }).join('');
   $('r-filtres').querySelectorAll('details').forEach(det => { etiquette(det, det.dataset.dim); chercherDans(det); });
   majRapport();
+  DASH.dessiner(RP.lignes);
 }
 function chercherDans(det) {
   const i = det.querySelector('.outils input'), f = i ? L.norm(i.value) : '';
@@ -840,6 +876,15 @@ $('r-raz').addEventListener('click', () => {
   $('r-du').value = $('r-au').value = $('r-txt').value = '';
   dessinerRapport();
 });
+/* ---------- Dashboard ---------- */
+// « Voir la liste des réserves » : mêmes filtres dans l'édition de rapport
+DASH.monter($('vue-dashboard'), { versRapport(sel, du, au) {
+  RAP.DIMS.forEach(d => { RP.sel[d.k] = new Set(sel[d.k] || []); });
+  $('r-du').value = du; $('r-au').value = au; $('r-txt').value = '';
+  dessinerRapport();
+  document.querySelector('nav button[data-vue="rapport"]').click();
+} });
+
 // une liste ouverte se referme quand on clique ailleurs
 document.addEventListener('click', ev => { document.querySelectorAll('details.multi[open]').forEach(d => { if (!d.contains(ev.target)) d.open = false; }); });
 
