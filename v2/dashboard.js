@@ -30,8 +30,11 @@ export function classeEtat(etat) {
 const FILTRES = ['ev', 'entr', 'lot', 'hall', 'etat', 'fact'];
 const PANNEAUX = [['ev', 'Par événement'], ['entr', 'Par entreprise'], ['lot', 'Par lot'], ['hall', 'Par hall / zone']];
 const MAX_BARRES = 12;
+/* Liste des réserves, affichée dès qu'un filtre est posé */
+const LISTE = [['num', 'N°'], ['ev', 'Événement'], ['plan', 'Hall / zone'], ['emp', 'Emplacement'], ['lot', 'Lot'], ['constat', 'Constat'], ['obs', 'Observations'], ['etat', 'État'], ['cre', 'Création'], ['entr', 'Entreprise']];
+const MAX_LISTE = 500;
 
-const DB = { sel: {}, lignes: [], mesure: 'n', tout: {}, el: null, hooks: {}, tips: [] };
+const DB = { sel: {}, lignes: [], mesure: 'n', tout: {}, tri: { k: '', sens: 1 }, el: null, hooks: {}, tips: [] };
 FILTRES.forEach(k => { DB.sel[k] = new Set(); });
 const dim = k => RAP.DIMS.find(d => d.k === k);
 
@@ -71,6 +74,14 @@ export function monter(el, hooks) {
   q('#d-corps').addEventListener('click', ev => {
     const plus = ev.target.closest('[data-tout]');
     if (plus) { DB.tout[plus.dataset.tout] = !DB.tout[plus.dataset.tout]; return maj(); }
+    const th = ev.target.closest('[data-tri]');
+    if (th) {   // tri de la liste : 1er clic croissant, 2e décroissant, 3e ordre des halls
+      const k = th.dataset.tri;
+      if (DB.tri.k !== k) DB.tri = { k, sens: 1 }; else if (DB.tri.sens === 1) DB.tri.sens = -1; else DB.tri = { k: '', sens: 1 };
+      const haut = q('#d-liste .tableau') ? q('#d-liste .tableau').scrollTop : 0;
+      maj(); if (q('#d-liste .tableau')) q('#d-liste .tableau').scrollTop = haut;
+      return;
+    }
     const t = ev.target.closest('[data-k]'); if (!t) return;
     const s = DB.sel[t.dataset.k], vs = JSON.parse(t.dataset.v);
     const tous = vs.every(v => s.has(v));
@@ -161,6 +172,19 @@ export function chronologie(rows) {
     cols: out.map(c => Object.assign({ lib: lib(c), n: (m.get(c) || []).length }, parEtat(m.get(c) || []))) };
 }
 
+// Réserves de la liste : par hall puis n°, ou selon la colonne cliquée
+export function trier(rows, tri) {
+  const base = OUT.parHall(rows);
+  if (!tri || !tri.k) return base;
+  const k = tri.k;
+  const cmp = k === 'num' ? (a, b) => (Number(a.num) - Number(b.num)) || cmpTxt(a.num, b.num)
+    : k === 'cre' ? (a, b) => a.jour - b.jour
+    : k === 'plan' ? (a, b) => OUT.cmpHall(a.plan, b.plan)
+    : k === 'etat' ? (a, b) => (classeEtat(a.etat) - classeEtat(b.etat)) || cmpTxt(a.etat, b.etat)
+    : (a, b) => cmpTxt(a[k], b[k]);
+  return base.sort((a, b) => tri.sens * cmp(a, b));   // tri stable : l'ordre des halls départage
+}
+
 /* ---------- Affichage ---------- */
 const segments = e => e.v.map((x, i) => x > 0 ? '<i style="flex:' + x + ' 1 0;background:' + ETATS[i].c + '"></i>' : '').join('');
 function bulle(titre, e, n) {
@@ -225,6 +249,20 @@ function maj() {
         '<span class="pile" style="height:' + (c.t * 100 / max) + '%">' + c.v.map((x, j) => x > 0 ? '<i style="flex:' + x + ' 1 0;background:' + ETATS[j].c + '"></i>' : '').join('') + '</span>' +
         '<span class="x">' + (peu || i % Math.ceil(T.cols.length / 12) === 0 ? esc(c.lib) : '') + '</span></div>').join('') + '</div>' +
       (T.sans ? '<p class="aide" style="margin-top:8px">' + T.sans + ' réserve(s) sans date de création ne figurent pas sur ce graphique.</p>' : '') + '</div>');
+  }
+  // liste des réserves, dès qu'un filtre est posé
+  const F = filtre(), filtrage = FILTRES.some(k => DB.sel[k].size) || F.du || F.au;
+  if (filtrage) {
+    const tri = trier(rows, DB.tri), vues = tri.slice(0, MAX_LISTE);
+    h.push('<div class="d-carte" id="d-liste"><h3>Réserves <small>' + rows.length + ' réserve' + (rows.length > 1 ? 's' : '') + ' · cliquez sur un en-tête pour trier</small></h3>' +
+      '<div class="tableau"><table><thead><tr>' + LISTE.map(c => '<th data-tri="' + c[0] + '">' + c[1] + (DB.tri.k === c[0] ? ' <i>' + (DB.tri.sens > 0 ? '▲' : '▼') + '</i>' : '') + '</th>').join('') + '</tr></thead><tbody>' +
+      vues.map(l => '<tr>' + LISTE.map(c => c[0] === 'etat'
+        ? '<td class="fixe"><span class="d-pt" style="background:' + ETATS[classeEtat(l.etat)].c + '"></span>' + esc(l.etat) + '</td>'
+        : '<td' + (c[0] === 'num' || c[0] === 'cre' ? ' class="fixe"' : '') + '>' + esc(l[c[0]]) + '</td>').join('') + '</tr>').join('') +
+      '</tbody></table></div>' +
+      (rows.length > MAX_LISTE ? '<p class="aide" style="margin-top:8px">Liste limitée aux ' + MAX_LISTE + ' premières réserves ; « Voir la liste des réserves » les donne toutes, avec PDF et Excel.</p>' : '') + '</div>');
+  } else {
+    h.push('<p class="aide" id="d-liste">Filtrez sur un événement, une entreprise, un lot, un hall, un état ou une période : la liste des réserves correspondantes s\'affiche ici.</p>');
   }
   q('#d-corps').innerHTML = h.join('');
 }

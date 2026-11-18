@@ -133,6 +133,8 @@
   .d-temps .pile { width: 70%; max-width: 34px; display: flex; flex-direction: column-reverse; gap: 2px; border-radius: 4px 4px 0 0; overflow: hidden; flex: 0 0 auto; max-height: calc(100% - 18px); }
   .d-temps .pile i { display: block; min-height: 2px; }
   .d-temps .x { position: absolute; top: 100%; margin-top: 4px; font-size: 11px; color: var(--gris); white-space: nowrap; }
+  #d-liste .tableau { max-height: 620px; border: 1px solid var(--ligne); } #d-liste td { overflow-wrap: anywhere; } #d-liste td.fixe { white-space: nowrap; overflow-wrap: normal; }
+  #d-liste th { cursor: pointer; user-select: none; white-space: nowrap; } #d-liste th:hover { text-decoration: underline; } #d-liste th i { font-style: normal; color: var(--orange); }
   @media (max-width: 600px) { .d-temps .col:nth-child(even) .x { display: none; } }
   .d-tip { display: none; position: fixed; z-index: 25; background: var(--blanc); border: 1px solid var(--ligne); border-radius: 8px; box-shadow: 0 8px 24px rgba(15,23,42,.16); padding: 9px 11px; font-size: 12.5px; color: var(--texte); min-width: 190px; max-width: 320px; pointer-events: none; }
   .d-tip b { display: block; color: var(--encre); margin-bottom: 5px; } .d-tip div { display: flex; align-items: center; gap: 2px; padding: 1px 0; }
@@ -307,7 +309,7 @@ import * as OUT from './sortie.js?v=8';
 import * as PLANS from './plans.js?v=1';
 import * as RAP from './rapport.js?v=10';
 import * as PHOTOS from './photos.js?v=1';
-import * as DASH from './dashboard.js?v=1';
+import * as DASH from './dashboard.js?v=2';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
